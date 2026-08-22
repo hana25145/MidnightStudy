@@ -127,6 +127,26 @@
           </dl>
         </article>
       </div>
+      <article class="card admin-card admin-seat-card">
+        <div class="admin-seat-heading">
+          <div><h2>오늘의 좌석 현황</h2><p id="adminSeatDate"></p></div>
+          <div class="admin-seat-filters">
+            <label>층
+              <select id="adminFloorSelect">
+                <option value="1">1층</option><option value="2">2층</option><option value="3">3층</option><option value="4">4층</option>
+                <option value="5">5층</option><option value="6">6층</option><option value="7">7층</option><option value="8">8층</option>
+              </select>
+            </label>
+            <label>타임
+              <select id="adminSessionSelect">
+                <option value="1">심야 1타임</option><option value="2">심야 2타임</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div id="adminSeatGrid" class="seat-grid admin-seat-grid"></div>
+        <p id="adminSeatSummary" class="admin-seat-summary"></p>
+      </article>
     </section>
   </main>
 </body>
