@@ -9,6 +9,31 @@ const client = supabase.createClient(
 
 let state = null;
 let refreshing = false;
+let boundaryTimer = null;
+
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function millisecondsUntilNextBoundary(now = new Date()) {
+  const shifted = new Date(now.getTime() + KST_OFFSET_MS);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+  const day = shifted.getUTCDate();
+  const boundaries = [
+    Date.UTC(year, month, day, 18, 0) - KST_OFFSET_MS,
+    Date.UTC(year, month, day, 23, 50) - KST_OFFSET_MS,
+    Date.UTC(year, month, day + 1, 0, 0) - KST_OFFSET_MS,
+    Date.UTC(year, month, day + 1, 18, 0) - KST_OFFSET_MS,
+  ];
+  return Math.min(...boundaries.filter((time) => time > now.getTime())) - now.getTime();
+}
+
+function scheduleBoundaryRefresh() {
+  clearTimeout(boundaryTimer);
+  boundaryTimer = setTimeout(async () => {
+    await refresh().catch(() => {});
+    scheduleBoundaryRefresh();
+  }, millisecondsUntilNextBoundary() + 100);
+}
 
 function setMessage(target, message, success = false) {
   target.textContent = message;
@@ -211,6 +236,7 @@ $('#cancelButton').addEventListener('click', async () => {
 });
 
 setInterval(() => refresh().catch(() => {}), 30_000);
+scheduleBoundaryRefresh();
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) refresh().catch(() => {});
 });
