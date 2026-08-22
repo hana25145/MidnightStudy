@@ -10,6 +10,7 @@ const client = supabase.createClient(
 let state = null;
 let refreshing = false;
 let boundaryTimer = null;
+let selectedSession = 1;
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -68,6 +69,7 @@ function switchTab(tabName) {
   });
   $('#loginForm').classList.toggle('hidden', tabName !== 'login');
   $('#signupForm').classList.toggle('hidden', tabName !== 'signup');
+  $('#adminSignupForm').classList.toggle('hidden', tabName !== 'admin');
   setMessage($('#authMessage'), '');
 }
 
@@ -78,10 +80,16 @@ function formatDate(date) {
 
 function render() {
   const loggedIn = Boolean(state?.user);
+  const isAdmin = state?.user?.role === 'admin';
   $('#authView').classList.toggle('hidden', loggedIn);
-  $('#dashboardView').classList.toggle('hidden', !loggedIn);
+  $('#dashboardView').classList.toggle('hidden', !loggedIn || isAdmin);
+  $('#adminView').classList.toggle('hidden', !isAdmin);
   $('#logoutButton').classList.toggle('hidden', !loggedIn);
   if (!loggedIn) return;
+  if (isAdmin) {
+    renderAdmin();
+    return;
+  }
 
   const { user, application, reservation, seats } = state;
   $('#todayLabel').textContent = formatDate(application.date);
@@ -90,7 +98,15 @@ function render() {
   $('#profileName').textContent = user.name;
   $('#profileRoom').textContent = user.room;
   $('#profileFloor').textContent = `${user.floor}층`;
+  $('#profilePeriod').textContent = ({ normal: '평상시', pre_exam: '고사 2주 전', exam: '고사기간' })[application.mode];
+  $('#profileStudyTime').textContent = `${application.sessionStart}–${application.sessionEnd}`;
   $('#avatar').textContent = user.name.slice(-1);
+
+  $('#sessionTabs').classList.toggle('hidden', !application.session2Available);
+  $$('.session-tab').forEach((tab) => {
+    tab.classList.toggle('active', Number(tab.dataset.session) === selectedSession);
+  });
+  $('#reservationTitle').textContent = `오늘의 신청 · ${selectedSession}타임`;
 
   const badge = $('#applicationBadge');
   badge.classList.toggle('open', application.open);
@@ -127,7 +143,7 @@ function render() {
     }
 
     button.disabled = seat.occupied || !application.open || Boolean(reservation);
-    button.setAttribute('aria-label', `${user.floor}층 ${seat.number}번 좌석${seat.occupied ? `, ${seat.applicantName} 신청 완료` : ', 선택 가능'}`);
+    button.setAttribute('aria-label', `${user.floor}층 ${seat.number}번 좌석${seat.occupied ? `, ${seat.applicantName} ${seat.applicantRoom} 신청 완료` : ', 선택 가능'}`);
     button.addEventListener('click', () => reserve(seat.number));
     grid.append(button);
   });
@@ -141,6 +157,16 @@ function render() {
   }
 }
 
+function renderAdmin() {
+  const settings = state.admin;
+  const modeLabel = ({ normal: '평상시', pre_exam: '고사 2주 전', exam: '고사기간' })[settings.currentMode];
+  $('#adminModeBadge').classList.toggle('open', settings.currentMode !== 'normal');
+  $('#adminModeBadge').querySelector('strong').textContent = modeLabel;
+  $('#examStart').value = settings.examStart || '';
+  $('#examEnd').value = settings.examEnd || '';
+  $('#preExamStart').textContent = settings.preExamStart || '—';
+}
+
 async function refresh() {
   if (refreshing) return;
   refreshing = true;
@@ -152,7 +178,11 @@ async function refresh() {
       return;
     }
 
-    const { data, error } = await client.rpc('get_dashboard');
+    let { data, error } = await client.rpc('get_dashboard', { p_session: selectedSession });
+    if (error && selectedSession === 2 && /2타임|고사기간/.test(error.message || '')) {
+      selectedSession = 1;
+      ({ data, error } = await client.rpc('get_dashboard', { p_session: 1 }));
+    }
     if (error) throw error;
     state = data;
     render();
@@ -165,9 +195,9 @@ async function refresh() {
 }
 
 async function reserve(seat) {
-  if (!confirm(`${state.user.floor}층 ${seat}번 좌석을 신청할까요?`)) return;
+  if (!confirm(`${selectedSession}타임 ${state.user.floor}층 ${seat}번 좌석을 신청할까요?`)) return;
   try {
-    const { data, error } = await client.rpc('reserve_seat', { p_seat: seat });
+    const { data, error } = await client.rpc('reserve_seat', { p_seat: seat, p_session: selectedSession });
     if (error) throw error;
     state = data;
     render();
@@ -222,22 +252,87 @@ $('#signupForm').addEventListener('submit', async (event) => {
   }
 });
 
+$('#adminSignupForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  setBusy(form, true);
+  try {
+    const values = Object.fromEntries(new FormData(form));
+    const { data: sessionData } = await client.auth.getSession();
+    if (!sessionData.session) {
+      const name = values.name.trim();
+      const email = await nameToEmail(name);
+      const { error: signupError } = await client.auth.signUp({
+        email,
+        password: values.password,
+        options: { data: { name, account_type: 'admin' } },
+      });
+      if (signupError) throw signupError;
+    }
+    const { data, error } = await client.rpc('claim_admin', { p_code: values.inviteCode.trim() });
+    if (error) throw error;
+    state = data;
+    form.reset();
+    render();
+  } catch (error) {
+    setMessage($('#authMessage'), readableError(error));
+  } finally {
+    setBusy(form, false);
+  }
+});
+
 $('#logoutButton').addEventListener('click', async () => {
   await client.auth.signOut();
   state = { user: null };
   render();
 });
 
+$$('.session-tab').forEach((tab) => tab.addEventListener('click', async () => {
+  selectedSession = Number(tab.dataset.session);
+  await refresh().catch((error) => setMessage($('#dashboardMessage'), readableError(error)));
+}));
+
 $('#cancelButton').addEventListener('click', async () => {
   if (!confirm('오늘의 좌석 신청을 취소할까요?')) return;
   try {
-    const { data, error } = await client.rpc('cancel_today_reservation');
+    const { data, error } = await client.rpc('cancel_today_reservation', { p_session: selectedSession });
     if (error) throw error;
     state = data;
     render();
     setMessage($('#dashboardMessage'), '좌석 신청을 취소했습니다.', true);
   } catch (error) {
     setMessage($('#dashboardMessage'), readableError(error));
+  }
+});
+
+$('#examPeriodForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  setBusy(form, true);
+  try {
+    const values = Object.fromEntries(new FormData(form));
+    const { data, error } = await client.rpc('set_exam_period', { p_start: values.start, p_end: values.end });
+    if (error) throw error;
+    state = data;
+    render();
+    setMessage($('#adminMessage'), '고사 일정을 저장했습니다.', true);
+  } catch (error) {
+    setMessage($('#adminMessage'), readableError(error));
+  } finally {
+    setBusy(form, false);
+  }
+});
+
+$('#clearExamButton').addEventListener('click', async () => {
+  if (!confirm('등록된 고사 일정을 삭제할까요?')) return;
+  try {
+    const { data, error } = await client.rpc('clear_exam_period');
+    if (error) throw error;
+    state = data;
+    render();
+    setMessage($('#adminMessage'), '고사 일정을 삭제했습니다.', true);
+  } catch (error) {
+    setMessage($('#adminMessage'), readableError(error));
   }
 });
 
