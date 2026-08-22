@@ -1,18 +1,14 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
-let state = null;
-let stateTimer = null;
-let refreshing = false;
 
-async function api(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || '요청을 처리하지 못했습니다.');
-  return data;
-}
+const client = supabase.createClient(
+  window.SUPABASE_CONFIG.url,
+  window.SUPABASE_CONFIG.publishableKey,
+  { auth: { persistSession: true, autoRefreshToken: true } }
+);
+
+let state = null;
+let refreshing = false;
 
 function setMessage(target, message, success = false) {
   target.textContent = message;
@@ -20,8 +16,23 @@ function setMessage(target, message, success = false) {
 }
 
 function setBusy(form, busy) {
-  const button = form.querySelector('button[type="submit"]');
-  button.disabled = busy;
+  form.querySelector('button[type="submit"]').disabled = busy;
+}
+
+function readableError(error) {
+  const message = error?.message || '요청을 처리하지 못했습니다.';
+  if (/invalid login credentials/i.test(message)) return '이름 또는 비밀번호가 올바르지 않습니다.';
+  if (/user already registered/i.test(message)) return '같은 이름으로 가입한 계정이 이미 있습니다.';
+  if (/database error saving new user/i.test(message)) return '같은 이름으로 가입한 계정이 있거나 입력 정보가 올바르지 않습니다.';
+  if (/password should be/i.test(message)) return '비밀번호는 8자 이상 입력해 주세요.';
+  return message;
+}
+
+async function nameToEmail(name) {
+  const normalized = name.trim().normalize('NFC').toLocaleLowerCase('ko-KR');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+  const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `student-${hash}@midnightstudy.local`;
 }
 
 function switchTab(tabName) {
@@ -48,7 +59,7 @@ function render() {
   if (!loggedIn) return;
 
   const { user, application, reservation, seats } = state;
-  $('#todayLabel').textContent = `${formatDate(application.date)} · NIGHT STUDY`;
+  $('#todayLabel').textContent = formatDate(application.date);
   $('#userName').textContent = user.name;
   $('#floorLabel').textContent = `${user.floor}층`;
   $('#profileName').textContent = user.name;
@@ -58,8 +69,12 @@ function render() {
 
   const badge = $('#applicationBadge');
   badge.classList.toggle('open', application.open);
-  badge.querySelector('strong').textContent = application.open ? `신청 가능 · ${application.closesAt} 마감` : `신청 마감 · ${application.opensAt} 오픈`;
-  $('#seatHelp').textContent = application.open ? '초록색 좌석을 눌러 선택하세요.' : `신청 가능 시간은 ${application.opensAt}~${application.closesAt}입니다.`;
+  badge.querySelector('strong').textContent = application.open
+    ? `신청 가능 · ${application.closesAt} 마감`
+    : `신청 마감 · ${application.opensAt} 오픈`;
+  $('#seatHelp').textContent = application.open
+    ? '좌석을 눌러 신청하세요.'
+    : `신청 가능 시간은 ${application.opensAt}~${application.closesAt}입니다.`;
 
   const grid = $('#seatGrid');
   grid.replaceChildren();
@@ -67,16 +82,19 @@ function render() {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `seat${seat.occupied ? ' occupied' : ''}${seat.mine ? ' mine' : ''}`;
+
     const number = document.createElement('span');
     number.className = 'seat-number';
     number.textContent = seat.number;
     button.append(number);
+
     if (seat.applicantName) {
       const name = document.createElement('small');
       name.className = 'seat-name';
       name.textContent = seat.applicantName;
       button.append(name);
     }
+
     button.disabled = seat.occupied || !application.open || Boolean(reservation);
     button.setAttribute('aria-label', `${user.floor}층 ${seat.number}번 좌석${seat.occupied ? `, ${seat.applicantName} 신청 완료` : ', 선택 가능'}`);
     button.addEventListener('click', () => reserve(seat.number));
@@ -86,7 +104,7 @@ function render() {
   $('#emptyReservation').classList.toggle('hidden', Boolean(reservation));
   $('#activeReservation').classList.toggle('hidden', !reservation);
   if (reservation) {
-    $('#reservationFloor').textContent = `${reservation.floor}층 · 나의 좌석`;
+    $('#reservationFloor').textContent = `${reservation.floor}층`;
     $('#reservationSeat').textContent = reservation.seat;
     $('#cancelButton').disabled = !application.open;
   }
@@ -96,30 +114,36 @@ async function refresh() {
   if (refreshing) return;
   refreshing = true;
   try {
-    state = await api('/api/session');
+    const { data: sessionData } = await client.auth.getSession();
+    if (!sessionData.session) {
+      state = { user: null };
+      render();
+      return;
+    }
+
+    const { data, error } = await client.rpc('get_dashboard');
+    if (error) throw error;
+    state = data;
     render();
-    scheduleStateRefresh();
+  } catch (error) {
+    if (/jwt|session|로그인이 필요/i.test(error.message || '')) await client.auth.signOut();
+    throw error;
   } finally {
     refreshing = false;
   }
 }
 
-function scheduleStateRefresh() {
-  clearTimeout(stateTimer);
-  const changeTime = new Date(state.application.nextChangeAt).getTime();
-  const delay = Math.max(500, Math.min(changeTime - Date.now() + 500, 2_147_000_000));
-  stateTimer = setTimeout(() => refresh().catch(() => {}), delay);
-}
-
 async function reserve(seat) {
   if (!confirm(`${state.user.floor}층 ${seat}번 좌석을 신청할까요?`)) return;
   try {
-    await api('/api/reservations', { method: 'POST', body: JSON.stringify({ seat }) });
-    await refresh();
+    const { data, error } = await client.rpc('reserve_seat', { p_seat: seat });
+    if (error) throw error;
+    state = data;
+    render();
     setMessage($('#dashboardMessage'), `${seat}번 좌석 신청이 완료되었습니다.`, true);
   } catch (error) {
-    setMessage($('#dashboardMessage'), error.message);
-    await refresh();
+    setMessage($('#dashboardMessage'), readableError(error));
+    await refresh().catch(() => {});
   }
 }
 
@@ -131,12 +155,16 @@ $('#loginForm').addEventListener('submit', async (event) => {
   setBusy(form, true);
   try {
     const values = Object.fromEntries(new FormData(form));
-    await api('/api/login', { method: 'POST', body: JSON.stringify(values) });
+    const email = await nameToEmail(values.name);
+    const { error } = await client.auth.signInWithPassword({ email, password: values.password });
+    if (error) throw error;
     form.reset();
     await refresh();
   } catch (error) {
-    setMessage($('#authMessage'), error.message);
-  } finally { setBusy(form, false); }
+    setMessage($('#authMessage'), readableError(error));
+  } finally {
+    setBusy(form, false);
+  }
 });
 
 $('#signupForm').addEventListener('submit', async (event) => {
@@ -145,32 +173,54 @@ $('#signupForm').addEventListener('submit', async (event) => {
   setBusy(form, true);
   try {
     const values = Object.fromEntries(new FormData(form));
-    await api('/api/signup', { method: 'POST', body: JSON.stringify(values) });
+    const name = values.name.trim();
+    const room = values.room.trim().toUpperCase().replace(/\s+/g, '');
+    const email = await nameToEmail(name);
+    const { error } = await client.auth.signUp({
+      email,
+      password: values.password,
+      options: { data: { name, room } },
+    });
+    if (error) throw error;
     form.reset();
     await refresh();
   } catch (error) {
-    setMessage($('#authMessage'), error.message);
-  } finally { setBusy(form, false); }
+    setMessage($('#authMessage'), readableError(error));
+  } finally {
+    setBusy(form, false);
+  }
 });
 
 $('#logoutButton').addEventListener('click', async () => {
-  await api('/api/logout', { method: 'POST' });
-  await refresh();
+  await client.auth.signOut();
+  state = { user: null };
+  render();
 });
 
 $('#cancelButton').addEventListener('click', async () => {
   if (!confirm('오늘의 좌석 신청을 취소할까요?')) return;
   try {
-    await api('/api/reservations/me', { method: 'DELETE' });
-    await refresh();
+    const { data, error } = await client.rpc('cancel_today_reservation');
+    if (error) throw error;
+    state = data;
+    render();
     setMessage($('#dashboardMessage'), '좌석 신청을 취소했습니다.', true);
-  } catch (error) { setMessage($('#dashboardMessage'), error.message); }
+  } catch (error) {
+    setMessage($('#dashboardMessage'), readableError(error));
+  }
 });
 
-// 다른 학생의 신청과 신청 시간 전환을 새로고침 없이 반영합니다.
 setInterval(() => refresh().catch(() => {}), 30_000);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) refresh().catch(() => {});
 });
-refresh().catch(() => setMessage($('#authMessage'), '서버에 연결할 수 없습니다.'));
+
+client.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') {
+    state = { user: null };
+    render();
+  }
+});
+
+refresh().catch((error) => setMessage($('#authMessage'), readableError(error)));
 
