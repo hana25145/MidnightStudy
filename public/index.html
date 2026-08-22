@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>심야 자습 신청</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">심야 자습 신청</a>
+    <button id="logoutButton" class="link-button hidden" type="button">로그아웃</button>
+  </header>
+
+  <main>
+    <section id="authView" class="auth-view">
+      <div class="auth-card">
+        <div class="tabs" role="tablist" aria-label="계정 메뉴">
+          <button class="tab active" data-tab="login" role="tab" aria-selected="true">로그인</button>
+          <button class="tab" data-tab="signup" role="tab" aria-selected="false">회원가입</button>
+        </div>
+
+        <form id="loginForm" class="form-panel">
+          <h1>로그인</h1>
+          <label>이름<input name="name" autocomplete="name" required></label>
+          <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
+          <button class="primary-button" type="submit">로그인</button>
+        </form>
+
+        <form id="signupForm" class="form-panel hidden">
+          <h1>회원가입</h1>
+          <label>이름<input name="name" autocomplete="name" placeholder="홍길동" required></label>
+          <label>기숙사 방<input name="room" autocomplete="off" placeholder="A303" required></label>
+          <p class="field-help">방 번호에서 이용 층을 자동으로 확인합니다.</p>
+          <label>비밀번호<input name="password" type="password" autocomplete="new-password" placeholder="8자 이상" required></label>
+          <button class="primary-button" type="submit">가입하기</button>
+        </form>
+        <p id="authMessage" class="message" role="alert"></p>
+      </div>
+    </section>
+
+    <section id="dashboardView" class="dashboard hidden">
+      <div class="page-heading">
+        <div><h1><span id="floorLabel"></span> 좌석 신청</h1><p id="todayLabel"></p></div>
+        <div id="applicationBadge" class="status-badge"><span></span><strong></strong></div>
+      </div>
+
+      <div class="content-grid">
+        <article class="card seat-card">
+          <div class="card-heading"><h2>좌석 선택</h2><p id="seatHelp"></p></div>
+          <div id="seatGrid" class="seat-grid"></div>
+          <div class="legend">
+            <span><i class="available"></i>선택 가능</span>
+            <span><i class="occupied"></i>신청 완료</span>
+            <span><i class="selected"></i>내 좌석</span>
+          </div>
+        </article>
+
+        <aside class="side-column">
+          <article class="card info-card">
+            <h2>내 정보</h2>
+            <dl>
+              <div><dt>이름</dt><dd id="profileName"></dd></div>
+              <div><dt>기숙사</dt><dd id="profileRoom"></dd></div>
+              <div><dt>이용 층</dt><dd id="profileFloor"></dd></div>
+              <div><dt>자습 시간</dt><dd>23:50–01:00</dd></div>
+            </dl>
+            <span id="userName" class="hidden"></span><span id="avatar" class="hidden"></span>
+          </article>
+
+          <article id="reservationCard" class="card reservation-card">
+            <h2>오늘의 신청</h2>
+            <div id="emptyReservation"><p>신청한 좌석이 없습니다.</p></div>
+            <div id="activeReservation" class="hidden">
+              <p id="reservationFloor"></p>
+              <div><strong id="reservationSeat"></strong><span>번 좌석</span></div>
+              <button id="cancelButton" class="secondary-button" type="button">신청 취소</button>
+            </div>
+          </article>
+        </aside>
+      </div>
+      <p id="dashboardMessage" class="message" role="alert"></p>
+    </section>
+  </main>
+</body>
+</html>
+
