@@ -83,6 +83,8 @@
               <div><dt>이용 층</dt><dd id="profileFloor"></dd></div>
               <div><dt>운영 구분</dt><dd id="profilePeriod"></dd></div>
               <div><dt>자습 시간</dt><dd id="profileStudyTime"></dd></div>
+              <div><dt>불참 누적</dt><dd id="profileAbsences"></dd></div>
+              <div><dt>신청 제한</dt><dd id="profileBan"></dd></div>
             </dl>
             <span id="userName" class="hidden"></span><span id="avatar" class="hidden"></span>
           </article>
@@ -126,10 +128,21 @@
             <div><dt>고사기간 2타임</dt><dd>01:30–02:30</dd></div>
           </dl>
         </article>
+        <article id="superAdminCard" class="card admin-card hidden">
+          <h2>총관리자 설정</h2>
+          <p class="admin-help">새 코드를 발급하면 기존 미사용 코드는 폐기됩니다.</p>
+          <button id="createInviteButton" class="secondary-button" type="button">새 관리자 초대 코드 발급</button>
+          <output id="inviteCodeOutput" class="invite-code hidden"></output>
+          <div class="transfer-box">
+            <label>총관리자 권한 이전<select id="adminTransferSelect"><option value="">관리자 선택</option></select></label>
+            <button id="transferAdminButton" class="secondary-button" type="button">선택한 계정으로 이전</button>
+          </div>
+          <p id="superAdminMessage" class="message" role="alert"></p>
+        </article>
       </div>
       <article class="card admin-card admin-seat-card">
         <div class="admin-seat-heading">
-          <div><h2>오늘의 좌석 현황</h2><p id="adminSeatDate"></p></div>
+          <div><h2>오늘의 좌석 현황</h2><p id="adminSeatDate"></p><p id="attendanceWindowLabel"></p></div>
           <div class="admin-seat-filters">
             <label>층
               <select id="adminFloorSelect">
