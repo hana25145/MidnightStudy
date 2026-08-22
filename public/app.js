@@ -103,6 +103,7 @@ function render() {
 
   const grid = $('#seatGrid');
   grid.replaceChildren();
+  grid.style.gridTemplateColumns = `repeat(${seats.length}, minmax(72px, 1fr))`;
   seats.forEach((seat) => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -118,6 +119,11 @@ function render() {
       name.className = 'seat-name';
       name.textContent = seat.applicantName;
       button.append(name);
+
+      const room = document.createElement('small');
+      room.className = 'seat-room';
+      room.textContent = seat.applicantRoom;
+      button.append(room);
     }
 
     button.disabled = seat.occupied || !application.open || Boolean(reservation);
