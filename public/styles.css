@@ -8,7 +8,7 @@ button,input { font:inherit; } button { color:inherit; } .hidden { display:none 
 main { width:min(1040px,calc(100% - 40px)); margin:0 auto; }
 .auth-view { min-height:calc(100vh - 64px); display:grid; place-items:center; padding:48px 0; }
 .auth-card { width:min(100%,400px); }
-.tabs { display:grid; grid-template-columns:1fr 1fr; margin-bottom:32px; border-bottom:1px solid var(--line); }
+.tabs { display:grid; grid-template-columns:repeat(3,1fr); margin-bottom:32px; border-bottom:1px solid var(--line); }
 .tab { border:0; border-bottom:2px solid transparent; padding:13px; color:var(--muted); background:transparent; cursor:pointer; }
 .tab.active { border-bottom-color:var(--green); color:var(--text); font-weight:700; }
 .form-panel h1 { margin:0 0 28px; font-size:24px; }
@@ -28,6 +28,9 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(36,92,67,.1);
 .card { border:1px solid var(--line); border-radius:10px; background:#fff; }
 .seat-card { padding:26px; } .card h2 { margin:0; font-size:16px; }
 .card-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; } .card-heading p { margin:0; color:var(--muted); font-size:12px; text-align:right; }
+.session-tabs { display:flex; gap:8px; margin-top:22px; }
+.session-tab { border:1px solid var(--line); border-radius:7px; padding:8px 12px; color:var(--muted); background:#fff; cursor:pointer; font-size:12px; }
+.session-tab.active { border-color:var(--green); color:var(--green); background:var(--green-soft); font-weight:700; }
 .seat-grid { display:grid; grid-template-columns:repeat(7,minmax(72px,1fr)); gap:10px; margin:30px 0 26px; overflow-x:auto; padding-bottom:4px; }
 .seat { height:82px; border:1px solid #b9cfbf; border-radius:8px; color:var(--green); background:var(--green-soft); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; font-size:20px; font-weight:750; transition:transform .15s,border-color .15s; }
 .seat-name,.seat-room { max-width:100%; overflow:hidden; text-overflow:ellipsis; color:inherit; font-size:11px; font-weight:600; line-height:1.1; white-space:nowrap; }
@@ -42,6 +45,11 @@ dl { margin:18px 0 0; } dl div { display:flex; justify-content:space-between; ga
 #activeReservation>div { margin:7px 0 18px; } #activeReservation strong { margin-right:5px; color:var(--green); font-size:36px; } #activeReservation span { font-size:13px; }
 .secondary-button { width:100%; height:38px; border:1px solid var(--line); border-radius:7px; background:#fff; cursor:pointer; font-size:12px; }
 .secondary-button:hover { background:var(--soft); } .secondary-button:disabled { opacity:.5; }
+.admin-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,.85fr); gap:20px; }
+.admin-card { padding:26px; } .admin-card h2 { margin-bottom:22px; }
+.admin-card .secondary-button { margin-top:10px; }
+.rule-card dl { margin-top:0; }
 @media (max-width:760px) { .topbar{padding:0 20px} main{width:min(100% - 28px,1040px)} .dashboard{padding-top:32px} .page-heading{align-items:flex-start;gap:18px} .content-grid{grid-template-columns:1fr} .side-column{grid-template-columns:1fr 1fr} }
-@media (max-width:520px) { .page-heading{display:grid} .seat-card{padding:20px 14px} .card-heading{display:grid;gap:8px} .card-heading p{text-align:left} .seat-grid{gap:8px;margin-top:22px} .seat{height:76px} .side-column{grid-template-columns:1fr} }
+@media (max-width:760px) { .admin-grid{grid-template-columns:1fr} }
+@media (max-width:520px) { .page-heading{display:grid} .seat-card{padding:20px 14px} .card-heading{display:grid;gap:8px} .card-heading p{text-align:left} .seat-grid{gap:8px;margin-top:22px} .seat{height:76px} .side-column{grid-template-columns:1fr} .tab{padding:11px 5px;font-size:12px} }
 
