@@ -271,7 +271,7 @@ declare
   v_code text;
 begin
   if not exists(select 1 from public.profiles where id=v_user_id and role='super_admin') then raise exception '총관리자 권한이 필요합니다.'; end if;
-  v_code:='MS-'||upper(encode(gen_random_bytes(9),'hex'));
+  v_code:=lpad(floor(random()*100000000)::bigint::text,8,'0');
   delete from public.admin_invites where used_at is null;
   insert into public.admin_invites(code_hash) values(crypt(v_code,gen_salt('bf')));
   return jsonb_build_object('code',v_code);
