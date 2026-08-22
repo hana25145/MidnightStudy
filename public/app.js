@@ -398,6 +398,7 @@ $('#adminSignupForm').addEventListener('submit', async (event) => {
     }
     const { data, error } = await client.rpc('claim_admin', { p_code: values.inviteCode.trim() });
     if (error) throw error;
+    if (data?.claimError) throw new Error(data.claimError);
     state = data;
     await loadAdminSeats();
     form.reset();
