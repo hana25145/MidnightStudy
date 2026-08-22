@@ -190,7 +190,7 @@ function renderAdminSeats() {
   $('#adminSessionSelect').querySelector('option[value="2"]').disabled = !adminSeatState.session2Available;
   $('#adminSeatDate').textContent = `${formatDate(adminSeatState.date)} · ${selectedAdminSession}타임`;
   $('#attendanceWindowLabel').textContent = adminSeatState.attendanceOpen
-    ? '출석 처리 가능 · 01:00 마감'
+    ? '출석·불참은 처리 후에도 01:00까지 변경할 수 있습니다.'
     : '출석 처리는 23:50~01:00에 가능합니다.';
 
   const grid = $('#adminSeatGrid');
