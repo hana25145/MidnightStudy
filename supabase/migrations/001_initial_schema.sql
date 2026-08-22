@@ -1,7 +1,7 @@
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null check (char_length(btrim(name)) between 2 and 20),
-  room text not null check (room ~ '^[AB][1-9][0-9]{2}$'),
+  room text not null check (room ~ '^[AB][1-9][0-9]{2}$' and room !~ '^A9'),
   floor smallint not null check (floor between 1 and 9),
   created_at timestamptz not null default now()
 );
@@ -13,7 +13,7 @@ create table public.reservations (
   user_id uuid not null references public.profiles(id) on delete cascade,
   study_date date not null,
   floor smallint not null check (floor between 1 and 9),
-  seat smallint not null check (seat between 1 and 7),
+  seat smallint not null check (seat between 1 and 15),
   created_at timestamptz not null default now(),
   unique (study_date, floor, seat),
   unique (study_date, user_id)
@@ -34,8 +34,12 @@ declare
   v_floor smallint;
 begin
   if v_name is null or char_length(v_name) < 2 or char_length(v_name) > 20 then raise exception '이름은 2~20자로 입력해 주세요.'; end if;
-  if v_room !~ '^[AB][1-9][0-9]{2}$' then raise exception '기숙사 방은 A303 또는 B206 형식으로 입력해 주세요.'; end if;
-  v_floor := substring(v_room from 2 for 1)::smallint;
+  if v_room !~ '^[AB][1-9][0-9]{2}$' or v_room ~ '^A9' then raise exception '기숙사 방은 A303 또는 B206 형식으로 입력해 주세요.'; end if;
+  v_floor := case
+    when v_room ~ '^B5' then 4
+    when v_room ~ '^B9' then 8
+    else substring(v_room from 2 for 1)::smallint
+  end;
   insert into public.profiles (id, name, room, floor) values (new.id, v_name, v_room, v_floor);
   return new;
 exception when unique_violation then
@@ -54,19 +58,21 @@ declare
   v_now timestamp := timezone('Asia/Seoul', now());
   v_date date;
   v_open boolean;
+  v_seat_count smallint;
 begin
   if v_user_id is null then raise exception '로그인이 필요합니다.'; end if;
   select * into v_profile from public.profiles where id = v_user_id;
   if not found then raise exception '사용자 정보를 찾을 수 없습니다.'; end if;
   v_date := v_now::date;
   v_open := v_now::time >= time '18:00' and v_now::time < time '23:50';
+  v_seat_count := case when v_profile.floor between 6 and 8 then 15 else 7 end;
   return jsonb_build_object(
     'user', jsonb_build_object('id',v_profile.id,'name',v_profile.name,'room',v_profile.room,'floor',v_profile.floor),
     'application', jsonb_build_object('date',to_char(v_date,'YYYY-MM-DD'),'open',v_open,'currentTime',to_char(v_now,'HH24:MI'),'opensAt','18:00','closesAt','23:50'),
     'reservation', (select jsonb_build_object('floor',r.floor,'seat',r.seat) from public.reservations r where r.user_id=v_user_id and r.study_date=v_date),
     'seats', (
-      select jsonb_agg(jsonb_build_object('number',s.seat,'occupied',r.id is not null,'mine',r.user_id=v_user_id,'applicantName',p.name) order by s.seat)
-      from generate_series(1,7) as s(seat)
+      select jsonb_agg(jsonb_build_object('number',s.seat,'occupied',r.id is not null,'mine',r.user_id=v_user_id,'applicantName',p.name,'applicantRoom',p.room) order by s.seat)
+      from generate_series(1,v_seat_count) as s(seat)
       left join public.reservations r on r.study_date=v_date and r.floor=v_profile.floor and r.seat=s.seat
       left join public.profiles p on p.id=r.user_id
     )
@@ -85,9 +91,9 @@ declare
 begin
   if v_user_id is null then raise exception '로그인이 필요합니다.'; end if;
   if v_now::time < time '18:00' or v_now::time >= time '23:50' then raise exception '신청은 18:00부터 23:50까지 가능합니다.'; end if;
-  if p_seat < 1 or p_seat > 7 then raise exception '좌석은 1~7번 중에서 선택해 주세요.'; end if;
   select * into v_profile from public.profiles where id=v_user_id;
   if not found then raise exception '사용자 정보를 찾을 수 없습니다.'; end if;
+  if p_seat < 1 or p_seat > case when v_profile.floor between 6 and 8 then 15 else 7 end then raise exception '해당 층에서 선택할 수 없는 좌석입니다.'; end if;
   if exists(select 1 from public.reservations where study_date=v_date and user_id=v_user_id) then raise exception '오늘 이미 신청한 좌석이 있습니다.'; end if;
   if exists(select 1 from public.reservations where study_date=v_date and floor=v_profile.floor and seat=p_seat) then raise exception '이미 신청된 좌석입니다.'; end if;
   insert into public.reservations(user_id,study_date,floor,seat) values(v_user_id,v_date,v_profile.floor,p_seat);
