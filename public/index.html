@@ -44,8 +44,8 @@
         <form id="adminSignupForm" class="form-panel hidden">
           <h1>관리자 등록</h1>
           <label>이름<input name="name" autocomplete="name" placeholder="사감 선생님" required></label>
-          <label>초대 코드<input name="inviteCode" autocomplete="off" required></label>
-          <p class="field-help">학교에서 전달받은 일회용 코드를 입력하세요.</p>
+          <label>초대 코드<input name="inviteCode" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" required></label>
+          <p class="field-help">학교에서 전달받은 8자리 숫자를 입력하세요.</p>
           <label>비밀번호<input name="password" type="password" autocomplete="new-password" placeholder="8자 이상" minlength="8" required></label>
           <button class="primary-button" type="submit">관리자 계정 만들기</button>
         </form>
