@@ -49,13 +49,25 @@ dl { margin:18px 0 0; } dl div { display:flex; justify-content:space-between; ga
 .admin-card { padding:26px; } .admin-card h2 { margin-bottom:22px; }
 .admin-card .secondary-button { margin-top:10px; }
 .rule-card dl { margin-top:0; }
+.admin-help { margin:-10px 0 16px; color:var(--muted); font-size:12px; }
+.invite-code { display:block; margin-top:12px; border:1px solid var(--line); border-radius:7px; padding:12px; color:var(--green); background:var(--green-soft); font-family:ui-monospace,monospace; font-weight:750; text-align:center; }
+.transfer-box { margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+.transfer-box label { margin-bottom:10px; }
 .admin-seat-card { margin-top:20px; }
 .admin-seat-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
 .admin-seat-heading h2 { margin-bottom:6px; } .admin-seat-heading p { margin:0; color:var(--muted); font-size:12px; }
 .admin-seat-filters { display:flex; gap:10px; }
 .admin-seat-filters label { display:flex; align-items:center; gap:7px; margin:0; color:var(--muted); font-size:12px; }
 select { height:36px; border:1px solid var(--line); border-radius:7px; padding:0 30px 0 10px; color:var(--text); background:#fff; }
-.admin-seat-grid .seat { cursor:default; } .admin-seat-grid .seat:hover { transform:none; }
+.admin-seat-grid .seat { min-height:138px; height:auto; padding:10px 7px; cursor:default; } .admin-seat-grid .seat:hover { transform:none; }
+.attendance-status { min-height:14px; color:var(--muted); font-size:10px; font-weight:700; }
+.attendance-status.present { color:var(--green); } .attendance-status.absent { color:var(--danger); }
+.admin-seat-actions { display:grid; grid-template-columns:1fr 1fr; gap:4px; width:100%; margin-top:4px; }
+.admin-seat-actions button { border:1px solid var(--line); border-radius:5px; padding:4px 2px; background:#fff; cursor:pointer; font-size:9px; }
+.admin-seat-actions button.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
+.admin-seat-actions button.absent.active { border-color:#d8aaa6; color:var(--danger); background:#fbefee; }
+.admin-seat-actions button.cancel { grid-column:1/-1; color:var(--danger); }
+.admin-seat-actions button:disabled { opacity:.4; cursor:not-allowed; }
 .admin-seat-summary { margin:0; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
 @media (max-width:760px) { .topbar{padding:0 20px} main{width:min(100% - 28px,1040px)} .dashboard{padding-top:32px} .page-heading{align-items:flex-start;gap:18px} .content-grid{grid-template-columns:1fr} .side-column{grid-template-columns:1fr 1fr} }
 @media (max-width:760px) { .admin-grid{grid-template-columns:1fr} .admin-seat-heading{display:grid}.admin-seat-filters{flex-wrap:wrap} }
