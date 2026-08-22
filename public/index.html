@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#ffffff">
   <title>심야 자습 신청</title>
   <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+  <script src="/supabase-config.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -25,7 +27,7 @@
         <form id="loginForm" class="form-panel">
           <h1>로그인</h1>
           <label>이름<input name="name" autocomplete="name" required></label>
-          <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
+          <label>비밀번호<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
           <button class="primary-button" type="submit">로그인</button>
         </form>
 
@@ -34,7 +36,7 @@
           <label>이름<input name="name" autocomplete="name" placeholder="홍길동" required></label>
           <label>기숙사 방<input name="room" autocomplete="off" placeholder="A303" required></label>
           <p class="field-help">방 번호에서 이용 층을 자동으로 확인합니다.</p>
-          <label>비밀번호<input name="password" type="password" autocomplete="new-password" placeholder="8자 이상" required></label>
+          <label>비밀번호<input name="password" type="password" autocomplete="new-password" placeholder="8자 이상" minlength="8" required></label>
           <button class="primary-button" type="submit">가입하기</button>
         </form>
         <p id="authMessage" class="message" role="alert"></p>
