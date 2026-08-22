@@ -11,6 +11,9 @@ let state = null;
 let refreshing = false;
 let boundaryTimer = null;
 let selectedSession = 1;
+let adminSeatState = null;
+let selectedAdminFloor = 1;
+let selectedAdminSession = 1;
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -165,6 +168,53 @@ function renderAdmin() {
   $('#examStart').value = settings.examStart || '';
   $('#examEnd').value = settings.examEnd || '';
   $('#preExamStart').textContent = settings.preExamStart || '—';
+  renderAdminSeats();
+}
+
+function renderAdminSeats() {
+  if (!adminSeatState) return;
+  $('#adminFloorSelect').value = String(selectedAdminFloor);
+  $('#adminSessionSelect').value = String(selectedAdminSession);
+  $('#adminSessionSelect').querySelector('option[value="2"]').disabled = !adminSeatState.session2Available;
+  $('#adminSeatDate').textContent = `${formatDate(adminSeatState.date)} · ${selectedAdminSession}타임`;
+
+  const grid = $('#adminSeatGrid');
+  grid.replaceChildren();
+  grid.style.gridTemplateColumns = `repeat(${adminSeatState.seats.length}, minmax(72px, 1fr))`;
+  adminSeatState.seats.forEach((seat) => {
+    const item = document.createElement('div');
+    item.className = `seat${seat.occupied ? ' occupied' : ''}`;
+    const number = document.createElement('span');
+    number.className = 'seat-number';
+    number.textContent = seat.number;
+    item.append(number);
+    if (seat.occupied) {
+      const name = document.createElement('small');
+      name.className = 'seat-name';
+      name.textContent = seat.applicantName;
+      const room = document.createElement('small');
+      room.className = 'seat-room';
+      room.textContent = seat.applicantRoom;
+      item.append(name, room);
+    }
+    grid.append(item);
+  });
+  const occupied = adminSeatState.seats.filter((seat) => seat.occupied).length;
+  $('#adminSeatSummary').textContent = `${selectedAdminFloor}층 · 신청 ${occupied}명 / 전체 ${adminSeatState.seats.length}석`;
+}
+
+async function loadAdminSeats() {
+  let { data, error } = await client.rpc('get_admin_seats', {
+    p_floor: selectedAdminFloor,
+    p_session: selectedAdminSession,
+  });
+  if (error) throw error;
+  if (selectedAdminSession === 2 && !data.session2Available) {
+    selectedAdminSession = 1;
+    ({ data, error } = await client.rpc('get_admin_seats', { p_floor: selectedAdminFloor, p_session: 1 }));
+    if (error) throw error;
+  }
+  adminSeatState = data;
 }
 
 async function refresh() {
@@ -185,6 +235,7 @@ async function refresh() {
     }
     if (error) throw error;
     state = data;
+    if (state?.user?.role === 'admin') await loadAdminSeats();
     render();
   } catch (error) {
     if (/jwt|session|로그인이 필요/i.test(error.message || '')) await client.auth.signOut();
@@ -272,6 +323,7 @@ $('#adminSignupForm').addEventListener('submit', async (event) => {
     const { data, error } = await client.rpc('claim_admin', { p_code: values.inviteCode.trim() });
     if (error) throw error;
     state = data;
+    await loadAdminSeats();
     form.reset();
     render();
   } catch (error) {
@@ -314,6 +366,7 @@ $('#examPeriodForm').addEventListener('submit', async (event) => {
     const { data, error } = await client.rpc('set_exam_period', { p_start: values.start, p_end: values.end });
     if (error) throw error;
     state = data;
+    await loadAdminSeats();
     render();
     setMessage($('#adminMessage'), '고사 일정을 저장했습니다.', true);
   } catch (error) {
@@ -329,8 +382,29 @@ $('#clearExamButton').addEventListener('click', async () => {
     const { data, error } = await client.rpc('clear_exam_period');
     if (error) throw error;
     state = data;
+    await loadAdminSeats();
     render();
     setMessage($('#adminMessage'), '고사 일정을 삭제했습니다.', true);
+  } catch (error) {
+    setMessage($('#adminMessage'), readableError(error));
+  }
+});
+
+$('#adminFloorSelect').addEventListener('change', async (event) => {
+  selectedAdminFloor = Number(event.target.value);
+  try {
+    await loadAdminSeats();
+    renderAdminSeats();
+  } catch (error) {
+    setMessage($('#adminMessage'), readableError(error));
+  }
+});
+
+$('#adminSessionSelect').addEventListener('change', async (event) => {
+  selectedAdminSession = Number(event.target.value);
+  try {
+    await loadAdminSeats();
+    renderAdminSeats();
   } catch (error) {
     setMessage($('#adminMessage'), readableError(error));
   }
