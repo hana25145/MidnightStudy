@@ -130,7 +130,6 @@ function render() {
 
   const grid = $('#seatGrid');
   grid.replaceChildren();
-  grid.style.gridTemplateColumns = `repeat(${seats.length}, minmax(72px, 1fr))`;
   seats.forEach((seat) => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -205,7 +204,6 @@ function renderAdminSeats() {
     heading.textContent = `${floorData.floor}층`;
     const grid = document.createElement('div');
     grid.className = 'seat-grid admin-seat-grid';
-    grid.style.gridTemplateColumns = `repeat(${floorData.seats.length}, minmax(132px, 1fr))`;
     floorData.seats.forEach((seat) => {
     const item = document.createElement('div');
     item.className = `seat${seat.occupied ? ' occupied' : ''}`;
