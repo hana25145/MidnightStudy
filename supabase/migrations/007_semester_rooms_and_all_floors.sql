@@ -1,0 +1,200 @@
+alter table public.profiles add column if not exists room_semester_start date;
+alter table public.system_settings add column if not exists semester_start date;
+
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public
+as $fn$
+declare
+  v_name text := btrim(new.raw_user_meta_data ->> 'name');
+  v_account_type text := coalesce(new.raw_user_meta_data ->> 'account_type', 'student');
+  v_room text := upper(regexp_replace(coalesce(new.raw_user_meta_data ->> 'room', ''), '\s+', '', 'g'));
+  v_floor smallint;
+  v_semester_start date;
+begin
+  if v_name is null or char_length(v_name) < 2 or char_length(v_name) > 20 then raise exception '이름은 2~20자로 입력해 주세요.'; end if;
+  if v_account_type = 'admin' then
+    insert into public.profiles (id,name,room,floor,role) values (new.id,v_name,null,null,'pending_admin');
+  else
+    if v_room !~ '^[AB][1-9][0-9]{2}$' or v_room ~ '^A9' then raise exception '기숙사 방은 A303 또는 B206 형식으로 입력해 주세요.'; end if;
+    v_floor := case when v_room ~ '^B5' then 4 when v_room ~ '^B9' then 8 else substring(v_room from 2 for 1)::smallint end;
+    select semester_start into v_semester_start from public.system_settings where id=1;
+    if v_semester_start > timezone('Asia/Seoul',now())::date then v_semester_start:=null; end if;
+    insert into public.profiles (id,name,room,floor,role,room_semester_start)
+      values (new.id,v_name,v_room,v_floor,'student',v_semester_start);
+  end if;
+  return new;
+exception when unique_violation then
+  raise exception '같은 이름으로 가입한 계정이 이미 있습니다.';
+end;
+$fn$;
+
+create or replace function public.get_dashboard(p_session integer default 1)
+returns jsonb language plpgsql security definer set search_path = public
+as $fn$
+declare
+  v_user_id uuid:=auth.uid(); v_profile public.profiles%rowtype;
+  v_now timestamp:=timezone('Asia/Seoul',now()); v_date date:=v_now::date;
+  v_open boolean:=v_now::time>=time '18:00' and v_now::time<time '23:50';
+  v_seat_count smallint; v_settings public.system_settings%rowtype;
+  v_mode text:='normal'; v_session_end text:='01:00'; v_blocked_until date;
+  v_absence_count smallint; v_room_update_required boolean:=false;
+begin
+  if v_user_id is null then raise exception '로그인이 필요합니다.'; end if;
+  select * into v_profile from public.profiles where id=v_user_id;
+  if not found then raise exception '사용자 정보를 찾을 수 없습니다.'; end if;
+  select * into v_settings from public.system_settings where id=1;
+  if v_settings.exam_start is not null and v_date between v_settings.exam_start and v_settings.exam_end then v_mode:='exam';
+  elsif v_settings.exam_start is not null and v_date between v_settings.exam_start-14 and v_settings.exam_start-1 then v_mode:='pre_exam'; end if;
+
+  if v_profile.role in ('admin','super_admin') then
+    return jsonb_build_object(
+      'user',jsonb_build_object('id',v_profile.id,'name',v_profile.name,'role',v_profile.role),
+      'admin',jsonb_build_object(
+        'examStart',to_char(v_settings.exam_start,'YYYY-MM-DD'),'examEnd',to_char(v_settings.exam_end,'YYYY-MM-DD'),
+        'preExamStart',to_char(v_settings.exam_start-14,'YYYY-MM-DD'),'semesterStart',to_char(v_settings.semester_start,'YYYY-MM-DD'),
+        'currentMode',v_mode,'isSuperAdmin',v_profile.role='super_admin'));
+  end if;
+  if v_profile.role='pending_admin' then raise exception '관리자 초대 코드 인증이 필요합니다.'; end if;
+  if v_profile.role='disabled' then raise exception '비활성화된 관리자 계정입니다.'; end if;
+  if p_session not in (1,2) then raise exception '올바르지 않은 타임입니다.'; end if;
+  if p_session=2 and v_mode<>'exam' then raise exception '심야 2타임은 고사기간에만 신청할 수 있습니다.'; end if;
+
+  v_room_update_required:=v_settings.semester_start is not null and v_date>=v_settings.semester_start
+    and v_profile.room_semester_start is distinct from v_settings.semester_start;
+  if v_mode in ('pre_exam','exam') then v_session_end:='01:30'; end if;
+  if p_session=2 then v_session_end:='02:30'; end if;
+  v_seat_count:=case when v_profile.floor between 6 and 8 then 15 else 7 end;
+  v_blocked_until:=case when v_profile.banned_until>v_date then v_profile.banned_until else null end;
+  v_absence_count:=case when v_profile.banned_until is not null and v_profile.banned_until<=v_date then 0 else v_profile.absence_count end;
+
+  return jsonb_build_object(
+    'user',jsonb_build_object('id',v_profile.id,'name',v_profile.name,'room',v_profile.room,'floor',v_profile.floor,'role',v_profile.role,
+      'absenceCount',v_absence_count,'bannedUntil',to_char(v_blocked_until,'YYYY-MM-DD'),
+      'roomUpdateRequired',v_room_update_required,'semesterStart',to_char(v_settings.semester_start,'YYYY-MM-DD')),
+    'application',jsonb_build_object('date',to_char(v_date,'YYYY-MM-DD'),'open',v_open,
+      'canApply',v_open and v_blocked_until is null and not v_room_update_required,
+      'currentTime',to_char(v_now,'HH24:MI'),'opensAt','18:00','closesAt','23:50','mode',v_mode,
+      'selectedSession',p_session,'sessionStart',case when p_session=1 then '23:50' else '01:30' end,
+      'sessionEnd',v_session_end,'session2Available',v_mode='exam','blockedUntil',to_char(v_blocked_until,'YYYY-MM-DD')),
+    'reservation',(select jsonb_build_object('floor',r.floor,'seat',r.seat,'session',r.session)
+      from public.reservations r where r.user_id=v_user_id and r.study_date=v_date and r.session=p_session),
+    'seats',(select jsonb_agg(jsonb_build_object('number',s.seat,'occupied',r.id is not null,'mine',r.user_id=v_user_id,
+      'applicantName',p.name,'applicantRoom',p.room) order by s.seat)
+      from generate_series(1,v_seat_count) s(seat)
+      left join public.reservations r on r.study_date=v_date and r.session=p_session and r.floor=v_profile.floor and r.seat=s.seat
+      left join public.profiles p on p.id=r.user_id));
+end;
+$fn$;
+
+create or replace function public.reserve_seat(p_seat integer,p_session integer default 1)
+returns jsonb language plpgsql security definer set search_path = public
+as $fn$
+declare
+  v_user_id uuid:=auth.uid(); v_profile public.profiles%rowtype;
+  v_now timestamp:=timezone('Asia/Seoul',now()); v_date date:=v_now::date;
+  v_seat_count smallint; v_settings public.system_settings%rowtype; v_exam_mode boolean;
+begin
+  if v_user_id is null then raise exception '로그인이 필요합니다.'; end if;
+  if v_now::time<time '18:00' or v_now::time>=time '23:50' then raise exception '신청은 18:00부터 23:50까지 가능합니다.'; end if;
+  select * into v_profile from public.profiles where id=v_user_id and role='student' for update;
+  if not found then raise exception '학생 계정에서만 신청할 수 있습니다.'; end if;
+  select * into v_settings from public.system_settings where id=1;
+  if v_settings.semester_start is not null and v_date>=v_settings.semester_start
+     and v_profile.room_semester_start is distinct from v_settings.semester_start then
+    raise exception '새 학기 기숙사 호실을 먼저 입력해 주세요.';
+  end if;
+  if v_profile.banned_until is not null and v_profile.banned_until>v_date then
+    raise exception '불참 누적으로 %까지 신청할 수 없습니다.',to_char(v_profile.banned_until,'YYYY-MM-DD');
+  elsif v_profile.banned_until is not null then
+    update public.profiles set absence_count=0,banned_until=null where id=v_user_id;
+  end if;
+  v_exam_mode:=v_settings.exam_start is not null and v_date between v_settings.exam_start and v_settings.exam_end;
+  if p_session not in (1,2) or (p_session=2 and not v_exam_mode) then raise exception '심야 2타임은 고사기간에만 신청할 수 있습니다.'; end if;
+  v_seat_count:=case when v_profile.floor between 6 and 8 then 15 else 7 end;
+  if p_seat<1 or p_seat>v_seat_count then raise exception '해당 층에서 선택할 수 없는 좌석입니다.'; end if;
+  if exists(select 1 from public.reservations where study_date=v_date and session=p_session and user_id=v_user_id) then raise exception '이 타임에 이미 신청한 좌석이 있습니다.'; end if;
+  if exists(select 1 from public.reservations where study_date=v_date and session=p_session and floor=v_profile.floor and seat=p_seat) then raise exception '이미 신청된 좌석입니다.'; end if;
+  insert into public.reservations(user_id,study_date,session,floor,seat) values(v_user_id,v_date,p_session,v_profile.floor,p_seat);
+  return public.get_dashboard(p_session);
+exception when unique_violation then raise exception '방금 다른 학생이 이 좌석을 신청했습니다.';
+end;
+$fn$;
+
+create or replace function public.set_semester_start(p_start date)
+returns jsonb language plpgsql security definer set search_path = public
+as $fn$
+declare v_user_id uuid:=auth.uid();
+begin
+  if not exists(select 1 from public.profiles where id=v_user_id and role in ('admin','super_admin')) then raise exception '관리자 권한이 필요합니다.'; end if;
+  if p_start is null then raise exception '학기 시작일을 입력해 주세요.'; end if;
+  update public.system_settings set semester_start=p_start,updated_at=now(),updated_by=v_user_id where id=1;
+  return public.get_dashboard(1);
+end;
+$fn$;
+
+create or replace function public.update_room(p_room text)
+returns jsonb language plpgsql security definer set search_path = public
+as $fn$
+declare
+  v_user_id uuid:=auth.uid(); v_room text:=upper(regexp_replace(coalesce(p_room,''),'\s+','','g'));
+  v_floor smallint; v_start date; v_date date:=timezone('Asia/Seoul',now())::date;
+begin
+  if not exists(select 1 from public.profiles where id=v_user_id and role='student') then raise exception '학생 계정에서만 호실을 변경할 수 있습니다.'; end if;
+  select semester_start into v_start from public.system_settings where id=1;
+  if v_start is null or v_date<v_start then raise exception '새 학기 호실 입력 기간이 아닙니다.'; end if;
+  if v_room !~ '^[AB][1-9][0-9]{2}$' or v_room ~ '^A9' then raise exception '기숙사 방은 A303 또는 B206 형식으로 입력해 주세요.'; end if;
+  if exists(select 1 from public.reservations where user_id=v_user_id and study_date=v_date) then
+    raise exception '오늘 신청한 좌석이 있어 관리자가 먼저 취소해야 합니다.';
+  end if;
+  v_floor:=case when v_room ~ '^B5' then 4 when v_room ~ '^B9' then 8 else substring(v_room from 2 for 1)::smallint end;
+  update public.profiles set room=v_room,floor=v_floor,room_semester_start=v_start where id=v_user_id;
+  return public.get_dashboard(1);
+end;
+$fn$;
+
+create or replace function public.get_admin_all_seats(p_session integer default 1)
+returns jsonb language plpgsql security definer set search_path = public
+as $fn$
+declare
+  v_user_id uuid:=auth.uid(); v_now timestamp:=timezone('Asia/Seoul',now()); v_date date;
+  v_settings public.system_settings%rowtype; v_session2_available boolean:=false; v_attendance_open boolean;
+begin
+  if not exists(select 1 from public.profiles where id=v_user_id and role in ('admin','super_admin')) then raise exception '관리자 권한이 필요합니다.'; end if;
+  if p_session not in (1,2) then raise exception '조회할 타임이 올바르지 않습니다.'; end if;
+  v_date:=case when v_now::time<time '03:00' then v_now::date-1 else v_now::date end;
+  v_attendance_open:=v_now::time>=time '23:50' or v_now::time<time '01:00';
+  select * into v_settings from public.system_settings where id=1;
+  v_session2_available:=v_settings.exam_start is not null and v_date between v_settings.exam_start and v_settings.exam_end;
+  return jsonb_build_object('date',to_char(v_date,'YYYY-MM-DD'),'session',p_session,
+    'session2Available',v_session2_available,'attendanceOpen',v_attendance_open,
+    'floors',(select jsonb_agg(jsonb_build_object('floor',f.floor,'gender',case when f.floor<=4 then 'male' else 'female' end,
+      'seats',(select jsonb_agg(jsonb_build_object('number',s.seat,'occupied',r.id is not null,'reservationId',r.id,
+        'applicantName',p.name,'applicantRoom',p.room,'attendanceStatus',a.status,'absenceCount',p.absence_count,
+        'bannedUntil',to_char(case when p.banned_until>v_date then p.banned_until else null end,'YYYY-MM-DD')) order by s.seat)
+        from generate_series(1,case when f.floor between 6 and 8 then 15 else 7 end) s(seat)
+        left join public.reservations r on r.study_date=v_date and r.session=p_session and r.floor=f.floor and r.seat=s.seat
+        left join public.profiles p on p.id=r.user_id
+        left join public.attendance_records a on a.study_date=v_date and a.user_id=r.user_id)) order by f.floor)
+      from generate_series(1,8) f(floor)));
+end;
+$fn$;
+
+create or replace function public.transfer_super_admin(p_target uuid)
+returns void language plpgsql security definer set search_path = public
+as $fn$
+declare v_user_id uuid:=auth.uid();
+begin
+  if not exists(select 1 from public.profiles where id=v_user_id and role='super_admin') then raise exception '총관리자 권한이 필요합니다.'; end if;
+  if not exists(select 1 from public.profiles where id=p_target and role='admin') then raise exception '이전할 관리자 계정을 찾을 수 없습니다.'; end if;
+  update public.profiles set role='admin' where id=v_user_id;
+  update public.profiles set role='super_admin' where id=p_target;
+end;
+$fn$;
+
+revoke all on function public.set_semester_start(date) from public,anon;
+revoke all on function public.update_room(text) from public,anon;
+revoke all on function public.get_admin_all_seats(integer) from public,anon;
+grant execute on function public.set_semester_start(date) to authenticated;
+grant execute on function public.update_room(text) to authenticated;
+grant execute on function public.get_admin_all_seats(integer) to authenticated;
+
