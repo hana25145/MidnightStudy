@@ -16,6 +16,7 @@ label { display:grid; gap:8px; margin-bottom:18px; font-size:13px; font-weight:6
 input { width:100%; height:46px; border:1px solid var(--line); border-radius:7px; padding:0 12px; background:#fff; outline:none; }
 input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(36,92,67,.1); }
 .field-help { margin:-10px 0 18px; color:var(--muted); font-size:12px; }
+.room-update-help { margin:-12px 0 24px; color:var(--muted); font-size:13px; line-height:1.6; }
 .primary-button { width:100%; height:46px; margin-top:4px; border:0; border-radius:7px; color:#fff; background:var(--green); cursor:pointer; font-weight:700; }
 .primary-button:hover { background:#1c4c36; } .primary-button:disabled { opacity:.55; cursor:wait; }
 .message { min-height:18px; margin:14px 0 0; color:var(--danger); font-size:12px; text-align:center; }
@@ -60,6 +61,12 @@ dl { margin:18px 0 0; } dl div { display:flex; justify-content:space-between; ga
 .admin-seat-filters label { display:flex; align-items:center; gap:7px; margin:0; color:var(--muted); font-size:12px; }
 select { height:36px; border:1px solid var(--line); border-radius:7px; padding:0 30px 0 10px; color:var(--text); background:#fff; }
 .admin-seat-grid .seat { min-height:138px; height:auto; padding:10px 7px; cursor:default; } .admin-seat-grid .seat:hover { transform:none; }
+.gender-floor-group { margin-top:28px; }
+.gender-floor-group + .gender-floor-group { padding-top:26px; border-top:1px solid var(--line); }
+.gender-floor-group h3 { margin:0 0 20px; font-size:15px; }
+.all-floor-seats { display:grid; gap:24px; }
+.floor-seat-block h4 { margin:0 0 8px; color:var(--muted); font-size:12px; }
+.floor-seat-block .seat-grid { margin:0; }
 .attendance-status { min-height:14px; color:var(--muted); font-size:10px; font-weight:700; }
 .attendance-status.present { color:var(--green); } .attendance-status.absent { color:var(--danger); }
 .admin-seat-actions { display:grid; grid-template-columns:1fr 1fr; gap:4px; width:100%; margin-top:4px; }
