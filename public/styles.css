@@ -32,8 +32,8 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(36,92,67,.1);
 .session-tabs { display:flex; gap:8px; margin-top:22px; }
 .session-tab { border:1px solid var(--line); border-radius:7px; padding:8px 12px; color:var(--muted); background:#fff; cursor:pointer; font-size:12px; }
 .session-tab.active { border-color:var(--green); color:var(--green); background:var(--green-soft); font-weight:700; }
-.seat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(58px,1fr)); gap:10px; margin:30px 0 26px; min-width:0; }
-.seat { height:82px; border:1px solid #b9cfbf; border-radius:8px; color:var(--green); background:var(--green-soft); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; font-size:20px; font-weight:750; transition:transform .15s,border-color .15s; }
+.seat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(52px,72px)); gap:10px; margin:30px 0 26px; min-width:0; }
+.seat { height:72px; border:1px solid #b9cfbf; border-radius:8px; color:var(--green); background:var(--green-soft); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:18px; font-weight:750; transition:transform .15s,border-color .15s; }
 .seat-name,.seat-room { max-width:100%; overflow:hidden; text-overflow:ellipsis; color:inherit; font-size:11px; font-weight:600; line-height:1.1; white-space:nowrap; }
 .seat-room { font-size:10px; font-weight:500; opacity:.82; }
 .seat:hover:not(:disabled) { transform:translateY(-2px); border-color:var(--green); } .seat:disabled { cursor:not-allowed; }
@@ -60,8 +60,8 @@ dl { margin:18px 0 0; } dl div { display:flex; justify-content:space-between; ga
 .admin-seat-filters { display:flex; gap:10px; }
 .admin-seat-filters label { display:flex; align-items:center; gap:7px; margin:0; color:var(--muted); font-size:12px; }
 select { height:36px; border:1px solid var(--line); border-radius:7px; padding:0 30px 0 10px; color:var(--text); background:#fff; }
-.admin-seat-grid { grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); }
-.admin-seat-grid .seat { min-width:0; min-height:138px; height:auto; padding:10px 7px; cursor:default; } .admin-seat-grid .seat:hover { transform:none; }
+.admin-seat-grid { grid-template-columns:repeat(auto-fit,minmax(88px,108px)); }
+.admin-seat-grid .seat { min-width:0; min-height:120px; height:auto; padding:8px 6px; cursor:default; } .admin-seat-grid .seat:hover { transform:none; }
 .gender-floor-group { margin-top:28px; }
 .gender-floor-group + .gender-floor-group { padding-top:26px; border-top:1px solid var(--line); }
 .gender-floor-group h3 { margin:0 0 20px; font-size:15px; }
@@ -79,5 +79,5 @@ select { height:36px; border:1px solid var(--line); border-radius:7px; padding:0
 .admin-seat-summary { margin:0; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
 @media (max-width:760px) { .topbar{padding:0 20px} main{width:min(100% - 28px,1040px)} .dashboard{padding-top:32px} .page-heading{align-items:flex-start;gap:18px} .content-grid{grid-template-columns:1fr} .side-column{grid-template-columns:1fr 1fr} }
 @media (max-width:760px) { .admin-grid{grid-template-columns:1fr} .admin-seat-heading{display:grid}.admin-seat-filters{flex-wrap:wrap} }
-@media (max-width:520px) { .page-heading{display:grid} .seat-card{padding:20px 14px} .card-heading{display:grid;gap:8px} .card-heading p{text-align:left} .seat-grid{grid-template-columns:repeat(auto-fit,minmax(54px,1fr));gap:8px;margin-top:22px} .admin-seat-grid{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:0}.seat{height:76px} .side-column{grid-template-columns:1fr} .tab{padding:11px 5px;font-size:12px} }
+@media (max-width:520px) { .page-heading{display:grid} .seat-card{padding:20px 14px} .admin-seat-card{padding:20px 14px}.card-heading{display:grid;gap:8px} .card-heading p{text-align:left} .seat-grid{grid-template-columns:repeat(auto-fit,minmax(50px,1fr));gap:8px;margin-top:22px} .admin-seat-grid{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:0}.admin-seat-grid .seat{min-height:118px;padding:7px 4px}.seat{height:66px} .side-column{grid-template-columns:1fr} .tab{padding:11px 5px;font-size:12px} }
 
