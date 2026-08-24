@@ -14,6 +14,7 @@ let selectedSession = 1;
 let adminSeatState = null;
 let selectedAdminSession = 1;
 let adminAccounts = [];
+let selectedAdminSeat = null;
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -188,6 +189,20 @@ function renderAdminAccounts() {
   $('#transferAdminButton').disabled = adminAccounts.length === 0;
 }
 
+function openAdminStudentDialog(seat, floor) {
+  selectedAdminSeat = seat;
+  $('#dialogStudentName').textContent = seat.applicantName;
+  $('#dialogStudentMeta').textContent = `${seat.applicantRoom} · ${floor}층 ${seat.number}번`;
+  $('#dialogAttendanceStatus').textContent = seat.attendanceStatus === 'present'
+    ? '현재 출석으로 처리되어 있습니다.'
+    : seat.attendanceStatus === 'absent' ? `현재 불참 · 누적 ${seat.absenceCount}회` : '아직 출석 처리를 하지 않았습니다.';
+  $('#dialogPresentButton').disabled = !adminSeatState.attendanceOpen;
+  $('#dialogAbsentButton').disabled = !adminSeatState.attendanceOpen;
+  $('#dialogPresentButton').classList.toggle('active', seat.attendanceStatus === 'present');
+  $('#dialogAbsentButton').classList.toggle('active', seat.attendanceStatus === 'absent');
+  $('#adminStudentDialog').showModal();
+}
+
 function renderAdminSeats() {
   if (!adminSeatState) return;
   $('#adminSessionSelect').value = String(selectedAdminSession);
@@ -205,7 +220,8 @@ function renderAdminSeats() {
     const grid = document.createElement('div');
     grid.className = 'seat-grid admin-seat-grid';
     floorData.seats.forEach((seat) => {
-    const item = document.createElement('div');
+    const item = document.createElement(seat.occupied ? 'button' : 'div');
+    if (seat.occupied) item.type = 'button';
     item.className = `seat${seat.occupied ? ' occupied' : ''}`;
     const number = document.createElement('span');
     number.className = 'seat-number';
@@ -218,31 +234,9 @@ function renderAdminSeats() {
       const room = document.createElement('small');
       room.className = 'seat-room';
       room.textContent = seat.applicantRoom;
-      const attendance = document.createElement('small');
-      attendance.className = `attendance-status ${seat.attendanceStatus || ''}`;
-      attendance.textContent = seat.attendanceStatus === 'present' ? '출석' : seat.attendanceStatus === 'absent' ? `불참 · 누적 ${seat.absenceCount}회` : '미처리';
-      const actions = document.createElement('div');
-      actions.className = 'admin-seat-actions';
-      const present = document.createElement('button');
-      present.type = 'button';
-      present.textContent = '출석';
-      present.disabled = !adminSeatState.attendanceOpen;
-      present.classList.toggle('active', seat.attendanceStatus === 'present');
-      present.addEventListener('click', () => markAttendance(seat.reservationId, 'present'));
-      const absent = document.createElement('button');
-      absent.type = 'button';
-      absent.textContent = '불참';
-      absent.className = 'absent';
-      absent.disabled = !adminSeatState.attendanceOpen;
-      absent.classList.toggle('active', seat.attendanceStatus === 'absent');
-      absent.addEventListener('click', () => markAttendance(seat.reservationId, 'absent'));
-      const cancel = document.createElement('button');
-      cancel.type = 'button';
-      cancel.textContent = '신청 취소';
-      cancel.className = 'cancel';
-      cancel.addEventListener('click', () => adminCancelReservation(seat));
-      actions.append(present, absent, cancel);
-      item.append(name, room, attendance, actions);
+      item.append(name, room);
+      item.setAttribute('aria-label', `${seat.applicantName} ${seat.applicantRoom}, ${floorData.floor}층 ${seat.number}번 좌석 관리`);
+      item.addEventListener('click', () => openAdminStudentDialog(seat, floorData.floor));
     }
       grid.append(item);
     });
@@ -288,6 +282,7 @@ async function markAttendance(reservationId, status) {
     if (error) throw error;
     await loadAdminSeats();
     renderAdminSeats();
+    $('#adminStudentDialog').close();
     setMessage($('#adminMessage'), status === 'present' ? '출석으로 처리했습니다.' : '불참으로 처리했습니다.', true);
   } catch (error) {
     setMessage($('#adminMessage'), readableError(error));
@@ -301,6 +296,7 @@ async function adminCancelReservation(seat) {
     if (error) throw error;
     await loadAdminSeats();
     renderAdminSeats();
+    $('#adminStudentDialog').close();
     setMessage($('#adminMessage'), '학생의 신청을 취소했습니다.', true);
   } catch (error) {
     setMessage($('#adminMessage'), readableError(error));
@@ -502,6 +498,18 @@ $('#clearExamButton').addEventListener('click', async () => {
   } catch (error) {
     setMessage($('#adminMessage'), readableError(error));
   }
+});
+
+$('#closeStudentDialog').addEventListener('click', () => $('#adminStudentDialog').close());
+$('#adminStudentDialog').addEventListener('close', () => { selectedAdminSeat = null; });
+$('#dialogPresentButton').addEventListener('click', () => {
+  if (selectedAdminSeat) markAttendance(selectedAdminSeat.reservationId, 'present');
+});
+$('#dialogAbsentButton').addEventListener('click', () => {
+  if (selectedAdminSeat) markAttendance(selectedAdminSeat.reservationId, 'absent');
+});
+$('#dialogCancelButton').addEventListener('click', () => {
+  if (selectedAdminSeat) adminCancelReservation(selectedAdminSeat);
 });
 
 $('#semesterStartForm').addEventListener('submit', async (event) => {
