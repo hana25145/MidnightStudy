@@ -12,7 +12,6 @@ let refreshing = false;
 let boundaryTimer = null;
 let selectedSession = 1;
 let adminSeatState = null;
-let selectedAdminFloor = 1;
 let selectedAdminSession = 1;
 let adminAccounts = [];
 
@@ -85,13 +84,19 @@ function formatDate(date) {
 function render() {
   const loggedIn = Boolean(state?.user);
   const isAdmin = ['admin', 'super_admin'].includes(state?.user?.role);
+  const needsRoomUpdate = loggedIn && !isAdmin && Boolean(state?.user?.roomUpdateRequired);
   $('#authView').classList.toggle('hidden', loggedIn);
-  $('#dashboardView').classList.toggle('hidden', !loggedIn || isAdmin);
+  $('#roomUpdateView').classList.toggle('hidden', !needsRoomUpdate);
+  $('#dashboardView').classList.toggle('hidden', !loggedIn || isAdmin || needsRoomUpdate);
   $('#adminView').classList.toggle('hidden', !isAdmin);
   $('#logoutButton').classList.toggle('hidden', !loggedIn);
   if (!loggedIn) return;
   if (isAdmin) {
     renderAdmin();
+    return;
+  }
+  if (needsRoomUpdate) {
+    $('#roomUpdateHelp').textContent = `${state.user.semesterStart} 시작 학기의 새 기숙사 호실을 입력해 주세요.`;
     return;
   }
 
@@ -170,6 +175,7 @@ function renderAdmin() {
   $('#adminModeBadge').querySelector('strong').textContent = modeLabel;
   $('#examStart').value = settings.examStart || '';
   $('#examEnd').value = settings.examEnd || '';
+  $('#semesterStart').value = settings.semesterStart || '';
   $('#preExamStart').textContent = settings.preExamStart || '—';
   $('#superAdminCard').classList.toggle('hidden', !settings.isSuperAdmin);
   if (settings.isSuperAdmin) renderAdminAccounts();
@@ -185,7 +191,6 @@ function renderAdminAccounts() {
 
 function renderAdminSeats() {
   if (!adminSeatState) return;
-  $('#adminFloorSelect').value = String(selectedAdminFloor);
   $('#adminSessionSelect').value = String(selectedAdminSession);
   $('#adminSessionSelect').querySelector('option[value="2"]').disabled = !adminSeatState.session2Available;
   $('#adminSeatDate').textContent = `${formatDate(adminSeatState.date)} · ${selectedAdminSession}타임`;
@@ -193,10 +198,15 @@ function renderAdminSeats() {
     ? '출석·불참은 처리 후에도 01:00까지 변경할 수 있습니다.'
     : '출석 처리는 23:50~01:00에 가능합니다.';
 
-  const grid = $('#adminSeatGrid');
-  grid.replaceChildren();
-  grid.style.gridTemplateColumns = `repeat(${adminSeatState.seats.length}, minmax(132px, 1fr))`;
-  adminSeatState.seats.forEach((seat) => {
+  const renderFloor = (floorData) => {
+    const block = document.createElement('section');
+    block.className = 'floor-seat-block';
+    const heading = document.createElement('h4');
+    heading.textContent = `${floorData.floor}층`;
+    const grid = document.createElement('div');
+    grid.className = 'seat-grid admin-seat-grid';
+    grid.style.gridTemplateColumns = `repeat(${floorData.seats.length}, minmax(132px, 1fr))`;
+    floorData.seats.forEach((seat) => {
     const item = document.createElement('div');
     item.className = `seat${seat.occupied ? ' occupied' : ''}`;
     const number = document.createElement('span');
@@ -236,21 +246,30 @@ function renderAdminSeats() {
       actions.append(present, absent, cancel);
       item.append(name, room, attendance, actions);
     }
-    grid.append(item);
+      grid.append(item);
+    });
+    block.append(heading, grid);
+    return block;
+  };
+
+  const male = $('#maleFloorSeats');
+  const female = $('#femaleFloorSeats');
+  male.replaceChildren();
+  female.replaceChildren();
+  adminSeatState.floors.forEach((floor) => {
+    (floor.gender === 'male' ? male : female).append(renderFloor(floor));
   });
-  const occupied = adminSeatState.seats.filter((seat) => seat.occupied).length;
-  $('#adminSeatSummary').textContent = `${selectedAdminFloor}층 · 신청 ${occupied}명 / 전체 ${adminSeatState.seats.length}석`;
+  const seats = adminSeatState.floors.flatMap((floor) => floor.seats);
+  const occupied = seats.filter((seat) => seat.occupied).length;
+  $('#adminSeatSummary').textContent = `전체 신청 ${occupied}명 / 전체 ${seats.length}석`;
 }
 
 async function loadAdminSeats() {
-  let { data, error } = await client.rpc('get_admin_seats', {
-    p_floor: selectedAdminFloor,
-    p_session: selectedAdminSession,
-  });
+  let { data, error } = await client.rpc('get_admin_all_seats', { p_session: selectedAdminSession });
   if (error) throw error;
   if (selectedAdminSession === 2 && !data.session2Available) {
     selectedAdminSession = 1;
-    ({ data, error } = await client.rpc('get_admin_seats', { p_floor: selectedAdminFloor, p_session: 1 }));
+    ({ data, error } = await client.rpc('get_admin_all_seats', { p_session: 1 }));
     if (error) throw error;
   }
   adminSeatState = data;
@@ -269,7 +288,7 @@ async function markAttendance(reservationId, status) {
       p_status: status,
     });
     if (error) throw error;
-    adminSeatState = data;
+    await loadAdminSeats();
     renderAdminSeats();
     setMessage($('#adminMessage'), status === 'present' ? '출석으로 처리했습니다.' : '불참으로 처리했습니다.', true);
   } catch (error) {
@@ -282,7 +301,7 @@ async function adminCancelReservation(seat) {
   try {
     const { data, error } = await client.rpc('admin_cancel_reservation', { p_reservation_id: seat.reservationId });
     if (error) throw error;
-    adminSeatState = data;
+    await loadAdminSeats();
     renderAdminSeats();
     setMessage($('#adminMessage'), '학생의 신청을 취소했습니다.', true);
   } catch (error) {
@@ -379,6 +398,26 @@ $('#signupForm').addEventListener('submit', async (event) => {
   }
 });
 
+$('#roomUpdateForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  setBusy(form, true);
+  try {
+    const values = Object.fromEntries(new FormData(form));
+    const room = values.room.trim().toUpperCase().replace(/\s+/g, '');
+    const { data, error } = await client.rpc('update_room', { p_room: room });
+    if (error) throw error;
+    state = data;
+    form.reset();
+    render();
+    setMessage($('#dashboardMessage'), '새 학기 호실을 저장했습니다.', true);
+  } catch (error) {
+    setMessage($('#roomUpdateMessage'), readableError(error));
+  } finally {
+    setBusy(form, false);
+  }
+});
+
 $('#adminSignupForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
@@ -467,6 +506,25 @@ $('#clearExamButton').addEventListener('click', async () => {
   }
 });
 
+$('#semesterStartForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const values = Object.fromEntries(new FormData(form));
+  if (!confirm(`${values.start}부터 학생들이 새 호실을 입력해야 신청할 수 있도록 설정할까요?`)) return;
+  setBusy(form, true);
+  try {
+    const { data, error } = await client.rpc('set_semester_start', { p_start: values.start });
+    if (error) throw error;
+    state = data;
+    render();
+    setMessage($('#semesterMessage'), '학기 시작일을 저장했습니다.', true);
+  } catch (error) {
+    setMessage($('#semesterMessage'), readableError(error));
+  } finally {
+    setBusy(form, false);
+  }
+});
+
 $('#createInviteButton').addEventListener('click', async () => {
   try {
     const { data, error } = await client.rpc('create_admin_invite');
@@ -483,26 +541,14 @@ $('#transferAdminButton').addEventListener('click', async () => {
   const target = $('#adminTransferSelect').value;
   const targetName = $('#adminTransferSelect').selectedOptions[0]?.textContent;
   if (!target) return;
-  if (!confirm(`${targetName} 계정으로 총관리자 권한을 이전할까요? 현재 계정은 즉시 비활성화됩니다.`)) return;
+  if (!confirm(`${targetName} 계정으로 총관리자 권한을 이전할까요? 현재 계정은 일반 관리자로 계속 이용할 수 있습니다.`)) return;
   try {
     const { error } = await client.rpc('transfer_super_admin', { p_target: target });
     if (error) throw error;
-    alert('총관리자 권한을 이전했습니다. 새 총관리자 계정으로 로그인해 주세요.');
-    await client.auth.signOut();
-    state = { user: null };
-    render();
+    alert('총관리자 권한을 이전했습니다. 현재 계정은 일반 관리자로 유지됩니다.');
+    await refresh();
   } catch (error) {
     setMessage($('#superAdminMessage'), readableError(error));
-  }
-});
-
-$('#adminFloorSelect').addEventListener('change', async (event) => {
-  selectedAdminFloor = Number(event.target.value);
-  try {
-    await loadAdminSeats();
-    renderAdminSeats();
-  } catch (error) {
-    setMessage($('#adminMessage'), readableError(error));
   }
 });
 
