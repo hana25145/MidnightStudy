@@ -185,6 +185,19 @@
       </article>
     </section>
   </main>
+
+  <dialog id="adminStudentDialog" class="student-dialog">
+    <div class="student-dialog-heading">
+      <div><h2 id="dialogStudentName"></h2><p id="dialogStudentMeta"></p></div>
+      <button id="closeStudentDialog" class="dialog-close" type="button" aria-label="닫기">×</button>
+    </div>
+    <p id="dialogAttendanceStatus" class="dialog-attendance"></p>
+    <div class="dialog-actions">
+      <button id="dialogPresentButton" type="button">출석</button>
+      <button id="dialogAbsentButton" class="absent" type="button">불참</button>
+      <button id="dialogCancelButton" class="cancel" type="button">신청 취소</button>
+    </div>
+  </dialog>
 </body>
 </html>
 
