@@ -82,6 +82,30 @@ function formatDate(date) {
     .format(new Date(`${date}T12:00:00+09:00`));
 }
 
+function renderSeatArrangement(container, seats, createSeat) {
+  container.replaceChildren();
+  container.className = `seat-grid${seats.length === 15 ? ' fifteen-seat-layout' : ''}`;
+  if (seats.length !== 15) {
+    seats.forEach((seat) => container.append(createSeat(seat)));
+    return;
+  }
+
+  const seatsByNumber = new Map(seats.map((seat) => [seat.number, seat]));
+  const front = document.createElement('div');
+  front.className = 'front-seat-bank';
+  [1, 2, 3, 4, 5, 6, 7].forEach((number) => front.append(createSeat(seatsByNumber.get(number))));
+
+  const rear = document.createElement('div');
+  rear.className = 'rear-seat-area';
+  [[9, 8, 11, 10], [13, 12, 15, 14]].forEach((numbers) => {
+    const pod = document.createElement('div');
+    pod.className = 'seat-pod';
+    numbers.forEach((number) => pod.append(createSeat(seatsByNumber.get(number))));
+    rear.append(pod);
+  });
+  container.append(front, rear);
+}
+
 function render() {
   const loggedIn = Boolean(state?.user);
   const isAdmin = ['admin', 'super_admin'].includes(state?.user?.role);
@@ -130,8 +154,7 @@ function render() {
     : application.open ? '좌석을 눌러 신청하세요.' : `신청 가능 시간은 ${application.opensAt}~${application.closesAt}입니다.`;
 
   const grid = $('#seatGrid');
-  grid.replaceChildren();
-  seats.forEach((seat) => {
+  renderSeatArrangement(grid, seats, (seat) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `seat${seat.occupied ? ' occupied' : ''}${seat.mine ? ' mine' : ''}`;
@@ -156,7 +179,7 @@ function render() {
     button.disabled = seat.occupied || !application.canApply || Boolean(reservation);
     button.setAttribute('aria-label', `${user.floor}층 ${seat.number}번 좌석${seat.occupied ? `, ${seat.applicantName} ${seat.applicantRoom} 신청 완료` : ', 선택 가능'}`);
     button.addEventListener('click', () => reserve(seat.number));
-    grid.append(button);
+    return button;
   });
 
   $('#emptyReservation').classList.toggle('hidden', Boolean(reservation));
@@ -218,28 +241,28 @@ function renderAdminSeats() {
     const heading = document.createElement('h4');
     heading.textContent = `${floorData.floor}층`;
     const grid = document.createElement('div');
-    grid.className = 'seat-grid admin-seat-grid';
-    floorData.seats.forEach((seat) => {
-    const item = document.createElement(seat.occupied ? 'button' : 'div');
-    if (seat.occupied) item.type = 'button';
-    item.className = `seat${seat.occupied ? ' occupied' : ''}`;
-    const number = document.createElement('span');
-    number.className = 'seat-number';
-    number.textContent = seat.number;
-    item.append(number);
-    if (seat.occupied) {
-      const name = document.createElement('small');
-      name.className = 'seat-name';
-      name.textContent = seat.applicantName;
-      const room = document.createElement('small');
-      room.className = 'seat-room';
-      room.textContent = seat.applicantRoom;
-      item.append(name, room);
-      item.setAttribute('aria-label', `${seat.applicantName} ${seat.applicantRoom}, ${floorData.floor}층 ${seat.number}번 좌석 관리`);
-      item.addEventListener('click', () => openAdminStudentDialog(seat, floorData.floor));
-    }
-      grid.append(item);
+    renderSeatArrangement(grid, floorData.seats, (seat) => {
+      const item = document.createElement(seat.occupied ? 'button' : 'div');
+      if (seat.occupied) item.type = 'button';
+      item.className = `seat${seat.occupied ? ' occupied' : ''}`;
+      const number = document.createElement('span');
+      number.className = 'seat-number';
+      number.textContent = seat.number;
+      item.append(number);
+      if (seat.occupied) {
+        const name = document.createElement('small');
+        name.className = 'seat-name';
+        name.textContent = seat.applicantName;
+        const room = document.createElement('small');
+        room.className = 'seat-room';
+        room.textContent = seat.applicantRoom;
+        item.append(name, room);
+        item.setAttribute('aria-label', `${seat.applicantName} ${seat.applicantRoom}, ${floorData.floor}층 ${seat.number}번 좌석 관리`);
+        item.addEventListener('click', () => openAdminStudentDialog(seat, floorData.floor));
+      }
+      return item;
     });
+    grid.classList.add('admin-seat-grid');
     block.append(heading, grid);
     return block;
   };
