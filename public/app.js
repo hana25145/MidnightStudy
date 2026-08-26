@@ -97,7 +97,7 @@ function renderSeatArrangement(container, seats, createSeat) {
 
   const rear = document.createElement('div');
   rear.className = 'rear-seat-area';
-  [[9, 8, 11, 10], [13, 12, 15, 14]].forEach((numbers) => {
+  [[9, 8, 10, 11], [13, 12, 14, 15]].forEach((numbers) => {
     const pod = document.createElement('div');
     pod.className = 'seat-pod';
     numbers.forEach((number) => pod.append(createSeat(seatsByNumber.get(number))));
