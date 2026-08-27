@@ -150,9 +150,11 @@ function render() {
   badge.classList.toggle('open', application.canApply);
   badge.querySelector('strong').textContent = application.blockedUntil
     ? `신청 제한 · ${application.blockedUntil}까지`
+    : application.session1Required ? '1타임 신청 필요'
     : application.open ? `신청 가능 · ${application.closesAt} 마감` : `신청 마감 · ${application.opensAt} 오픈`;
   $('#seatHelp').textContent = application.blockedUntil
     ? '불참 2회 누적으로 신청이 제한되었습니다.'
+    : application.session1Required ? '2타임은 같은 날 1타임 좌석을 먼저 신청해야 합니다.'
     : application.open ? '좌석을 눌러 신청하세요.' : `신청 가능 시간은 ${application.opensAt}~${application.closesAt}입니다.`;
 
   const grid = $('#seatGrid');
@@ -186,10 +188,17 @@ function render() {
 
   $('#emptyReservation').classList.toggle('hidden', Boolean(reservation));
   $('#activeReservation').classList.toggle('hidden', !reservation);
+  $('#cancelButton').textContent = '신청 취소';
+  $('#cancelButton').removeAttribute('title');
   if (reservation) {
     $('#reservationFloor').textContent = `${reservation.floor}층`;
     $('#reservationSeat').textContent = reservation.seat;
-    $('#cancelButton').disabled = !application.open;
+    const mustCancelSession2First = selectedSession === 1 && application.hasSession2Reservation;
+    $('#cancelButton').disabled = !application.open || mustCancelSession2First;
+    if (mustCancelSession2First) {
+      $('#cancelButton').textContent = '2타임 신청을 먼저 취소하세요';
+      $('#cancelButton').title = '2타임을 신청한 상태에서는 1타임을 먼저 취소할 수 없습니다.';
+    }
   }
 }
 
