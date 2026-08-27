@@ -63,7 +63,8 @@ dl { margin:18px 0 0; } dl div { display:flex; justify-content:space-between; ga
 .admin-seat-heading h2 { margin-bottom:6px; } .admin-seat-heading p { margin:0; color:var(--muted); font-size:12px; }
 .admin-seat-filters { display:flex; gap:10px; }
 .admin-seat-filters label { display:flex; align-items:center; gap:7px; margin:0; color:var(--muted); font-size:12px; }
-select { height:36px; border:1px solid var(--line); border-radius:7px; padding:0 30px 0 10px; color:var(--text); background:#fff; }
+select,.admin-seat-filters input { height:36px; border:1px solid var(--line); border-radius:7px; padding:0 10px; color:var(--text); background:#fff; }
+select { padding-right:30px; }
 .admin-seat-grid { grid-template-columns:repeat(auto-fit,minmax(48px,58px)); gap:8px; }
 .admin-seat-grid.fifteen-seat-layout { grid-template-columns:1fr; }
 .admin-seat-grid .front-seat-bank { grid-template-columns:repeat(7,58px); gap:8px; padding:6px; }
@@ -95,6 +96,6 @@ select { height:36px; border:1px solid var(--line); border-radius:7px; padding:0
 .dialog-actions button:disabled { opacity:.4; cursor:not-allowed; }
 .admin-seat-summary { margin:0; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
 @media (max-width:760px) { .topbar{padding:0 20px} main{width:min(100% - 28px,1040px)} .dashboard{padding-top:32px} .page-heading{align-items:flex-start;gap:18px} .content-grid{grid-template-columns:1fr} .side-column{grid-template-columns:1fr 1fr} }
-@media (max-width:760px) { .admin-grid{grid-template-columns:1fr} .admin-seat-heading{display:grid}.admin-seat-filters{flex-wrap:wrap} }
+@media (max-width:760px) { .admin-grid{grid-template-columns:1fr} .admin-seat-heading{display:grid}.admin-seat-filters{display:grid;grid-template-columns:1fr 1fr}.admin-seat-filters label{display:grid;gap:5px}.admin-seat-filters input,.admin-seat-filters select{width:100%} }
 @media (max-width:520px) { .page-heading{display:grid} .seat-card{padding:20px 14px} .admin-seat-card{padding:20px 14px}.card-heading{display:grid;gap:8px} .card-heading p{text-align:left} .seat-grid{grid-template-columns:repeat(auto-fit,minmax(50px,1fr));gap:8px;margin-top:22px}.fifteen-seat-layout{grid-template-columns:1fr}.front-seat-bank{grid-template-columns:repeat(4,minmax(0,1fr));width:100%;gap:8px;padding:8px}.seat-pod{grid-template-columns:repeat(2,62px);gap:8px;padding:8px}.admin-seat-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:0}.admin-seat-grid.fifteen-seat-layout{grid-template-columns:1fr}.admin-seat-grid .front-seat-bank{grid-template-columns:repeat(4,minmax(0,1fr));width:100%;gap:6px;padding:5px}.admin-seat-grid .seat-pod{grid-template-columns:repeat(2,54px);gap:5px;padding:5px}.admin-seat-grid .seat{min-height:58px;height:58px;padding:4px 2px}.seat{height:66px} .side-column{grid-template-columns:1fr} .tab{padding:11px 5px;font-size:12px} }
 
