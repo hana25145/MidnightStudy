@@ -211,6 +211,41 @@ function renderAdminAccounts() {
   select.replaceChildren(new Option('관리자 선택', ''));
   adminAccounts.forEach((account) => select.add(new Option(account.name, account.id)));
   $('#transferAdminButton').disabled = adminAccounts.length === 0;
+
+  const list = $('#adminAccountList');
+  list.replaceChildren();
+  if (adminAccounts.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'admin-account-empty';
+    empty.textContent = '등록된 일반 관리자가 없습니다.';
+    list.append(empty);
+    return;
+  }
+  adminAccounts.forEach((account) => {
+    const row = document.createElement('div');
+    row.className = 'admin-account-row';
+    const name = document.createElement('span');
+    name.textContent = account.name;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = '계정 삭제';
+    button.addEventListener('click', () => deleteAdminAccount(account));
+    row.append(name, button);
+    list.append(row);
+  });
+}
+
+async function deleteAdminAccount(account) {
+  if (!confirm(`${account.name} 관리자 계정을 삭제할까요? 삭제한 계정은 복구할 수 없습니다.`)) return;
+  try {
+    const { error } = await client.rpc('delete_admin_account', { p_target: account.id });
+    if (error) throw error;
+    await loadAdminAccounts();
+    renderAdminAccounts();
+    setMessage($('#superAdminMessage'), `${account.name} 관리자 계정을 삭제했습니다.`, true);
+  } catch (error) {
+    setMessage($('#superAdminMessage'), readableError(error));
+  }
 }
 
 function openAdminStudentDialog(seat, floor) {
