@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <title>심야 자습 신청</title>
+  <title>심야 면학 신청</title>
   <link rel="stylesheet" href="./styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
   <script src="./supabase-config.js" defer></script>
@@ -12,7 +12,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="./">심야 자습 신청</a>
+    <a class="brand" href="./">심야 면학 신청</a>
     <button id="logoutButton" class="link-button hidden" type="button">로그아웃</button>
   </header>
 
@@ -43,7 +43,7 @@
 
         <form id="adminSignupForm" class="form-panel hidden">
           <h1>관리자 등록</h1>
-          <label>이름<input name="name" autocomplete="name" placeholder="사감 선생님" required></label>
+          <label>이름<input name="name" autocomplete="name" required></label>
           <label>초대 코드<input name="inviteCode" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" required></label>
           <p class="field-help">학교에서 전달받은 8자리 숫자를 입력하세요.</p>
           <label>비밀번호<input name="password" type="password" autocomplete="new-password" placeholder="8자 이상" minlength="8" required></label>
@@ -138,7 +138,8 @@
             <div><dt>고사 2주 전 시작</dt><dd id="preExamStart">—</dd></div>
             <div><dt>평상시 1타임</dt><dd>23:50–01:00</dd></div>
             <div><dt>고사 2주 전 1타임</dt><dd>23:50–01:30</dd></div>
-            <div><dt>고사기간 2타임</dt><dd>01:30–02:30</dd></div>
+            <div><dt>고사기간 적용 야간</dt><dd>첫 고사 전날–마지막 고사 전날</dd></div>
+            <div><dt>고사기간 1·2타임</dt><dd>23:50–02:30</dd></div>
           </dl>
         </article>
         <article class="card admin-card">
@@ -158,6 +159,11 @@
           <div class="transfer-box">
             <label>총관리자 권한 이전<select id="adminTransferSelect"><option value="">관리자 선택</option></select></label>
             <button id="transferAdminButton" class="secondary-button" type="button">선택한 계정으로 이전</button>
+          </div>
+          <div class="admin-account-box">
+            <h3>관리자 계정</h3>
+            <p class="admin-help">일반 관리자 계정만 삭제할 수 있습니다.</p>
+            <div id="adminAccountList" class="admin-account-list"></div>
           </div>
           <p id="superAdminMessage" class="message" role="alert"></p>
         </article>
