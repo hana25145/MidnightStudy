@@ -26,6 +26,7 @@ function millisecondsUntilNextBoundary(now = new Date()) {
   const day = shifted.getUTCDate();
   const boundaries = [
     Date.UTC(year, month, day, 18, 0) - KST_OFFSET_MS,
+    Date.UTC(year, month, day, 23, 40) - KST_OFFSET_MS,
     Date.UTC(year, month, day, 23, 50) - KST_OFFSET_MS,
     Date.UTC(year, month, day + 1, 0, 0) - KST_OFFSET_MS,
     Date.UTC(year, month, day + 1, 18, 0) - KST_OFFSET_MS,
