@@ -13,6 +13,7 @@ let boundaryTimer = null;
 let selectedSession = 1;
 let adminSeatState = null;
 let selectedAdminSession = 1;
+let selectedAdminDate = null;
 let adminAccounts = [];
 let selectedAdminSeat = null;
 
@@ -221,6 +222,7 @@ function openAdminStudentDialog(seat, floor) {
     : seat.attendanceStatus === 'absent' ? `현재 불참 · 누적 ${seat.absenceCount}회` : '아직 출석 처리를 하지 않았습니다.';
   $('#dialogPresentButton').disabled = !adminSeatState.attendanceOpen;
   $('#dialogAbsentButton').disabled = !adminSeatState.attendanceOpen;
+  $('#dialogCancelButton').disabled = !adminSeatState.editable;
   $('#dialogPresentButton').classList.toggle('active', seat.attendanceStatus === 'present');
   $('#dialogAbsentButton').classList.toggle('active', seat.attendanceStatus === 'absent');
   $('#adminStudentDialog').showModal();
@@ -230,10 +232,14 @@ function renderAdminSeats() {
   if (!adminSeatState) return;
   $('#adminSessionSelect').value = String(selectedAdminSession);
   $('#adminSessionSelect').querySelector('option[value="2"]').disabled = !adminSeatState.session2Available;
+  $('#adminDateSelect').value = selectedAdminDate || adminSeatState.date;
+  $('#adminDateSelect').max = adminSeatState.currentDate || adminSeatState.date;
   $('#adminSeatDate').textContent = `${formatDate(adminSeatState.date)} · ${selectedAdminSession}타임`;
-  $('#attendanceWindowLabel').textContent = adminSeatState.attendanceOpen
-    ? '출석·불참은 처리 후에도 01:00까지 변경할 수 있습니다.'
-    : '출석 처리는 23:50~01:00에 가능합니다.';
+  $('#attendanceWindowLabel').textContent = !adminSeatState.editable
+    ? '과거 기록은 조회만 할 수 있습니다.'
+    : adminSeatState.attendanceOpen
+      ? '출석·불참은 처리 후에도 01:00까지 변경할 수 있습니다.'
+      : '출석 처리는 23:50~01:00에 가능합니다.';
 
   const renderFloor = (floorData) => {
     const block = document.createElement('section');
@@ -257,7 +263,7 @@ function renderAdminSeats() {
         room.className = 'seat-room';
         room.textContent = seat.applicantRoom;
         item.append(name, room);
-        item.setAttribute('aria-label', `${seat.applicantName} ${seat.applicantRoom}, ${floorData.floor}층 ${seat.number}번 좌석 관리`);
+        item.setAttribute('aria-label', `${seat.applicantName} ${seat.applicantRoom}, ${floorData.floor}층 ${seat.number}번 좌석 ${adminSeatState.editable ? '관리' : '기록 보기'}`);
         item.addEventListener('click', () => openAdminStudentDialog(seat, floorData.floor));
       }
       return item;
@@ -280,11 +286,19 @@ function renderAdminSeats() {
 }
 
 async function loadAdminSeats() {
-  let { data, error } = await client.rpc('get_admin_all_seats', { p_session: selectedAdminSession });
+  const rpcName = selectedAdminDate ? 'get_admin_seat_history' : 'get_admin_all_seats';
+  const params = { p_session: selectedAdminSession };
+  if (selectedAdminDate) params.p_date = selectedAdminDate;
+  let { data, error } = await client.rpc(rpcName, params);
   if (error) throw error;
+  if (!selectedAdminDate) {
+    data.editable = true;
+    data.currentDate = data.date;
+  }
   if (selectedAdminSession === 2 && !data.session2Available) {
     selectedAdminSession = 1;
-    ({ data, error } = await client.rpc('get_admin_all_seats', { p_session: 1 }));
+    params.p_session = 1;
+    ({ data, error } = await client.rpc(rpcName, params));
     if (error) throw error;
   }
   adminSeatState = data;
@@ -313,6 +327,7 @@ async function markAttendance(reservationId, status) {
 }
 
 async function adminCancelReservation(seat) {
+  if (!adminSeatState?.editable) return;
   if (!confirm(`${seat.applicantName} (${seat.applicantRoom}) 학생의 신청을 취소할까요?`)) return;
   try {
     const { data, error } = await client.rpc('admin_cancel_reservation', { p_reservation_id: seat.reservationId });
@@ -591,6 +606,17 @@ $('#adminSessionSelect').addEventListener('change', async (event) => {
   }
 });
 
+$('#adminDateSelect').addEventListener('change', async (event) => {
+  selectedAdminDate = event.target.value || null;
+  setMessage($('#adminHistoryMessage'), '');
+  try {
+    await loadAdminSeats();
+    renderAdminSeats();
+  } catch (error) {
+    setMessage($('#adminHistoryMessage'), readableError(error));
+  }
+});
+
 setInterval(() => refresh().catch(() => {}), 30_000);
 scheduleBoundaryRefresh();
 document.addEventListener('visibilitychange', () => {
@@ -599,6 +625,7 @@ document.addEventListener('visibilitychange', () => {
 
 client.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') {
+    selectedAdminDate = null;
     state = { user: null };
     render();
   }
