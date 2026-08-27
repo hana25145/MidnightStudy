@@ -58,6 +58,13 @@ dl { margin:18px 0 0; } dl div { display:flex; justify-content:space-between; ga
 .invite-code { display:block; margin-top:12px; border:1px solid var(--line); border-radius:7px; padding:12px; color:var(--green); background:var(--green-soft); font-family:ui-monospace,monospace; font-weight:750; text-align:center; }
 .transfer-box { margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
 .transfer-box label { margin-bottom:10px; }
+.admin-account-box { margin-top:22px; padding-top:18px; border-top:1px solid var(--line); }
+.admin-account-box h3 { margin:0 0 14px; font-size:14px; }
+.admin-account-box .admin-help { margin:-6px 0 10px; }
+.admin-account-list { display:grid; gap:7px; }
+.admin-account-row { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; padding:6px 8px 6px 12px; border:1px solid var(--line); border-radius:7px; font-size:12px; }
+.admin-account-row button { border:0; padding:7px 9px; border-radius:6px; color:var(--danger); background:#fbefee; cursor:pointer; font-size:11px; }
+.admin-account-empty { margin:0; color:var(--muted); font-size:12px; }
 .admin-seat-card { margin-top:20px; }
 .admin-seat-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
 .admin-seat-heading h2 { margin-bottom:6px; } .admin-seat-heading p { margin:0; color:var(--muted); font-size:12px; }
