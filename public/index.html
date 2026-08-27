@@ -164,8 +164,11 @@
       </div>
       <article class="card admin-card admin-seat-card">
         <div class="admin-seat-heading">
-          <div><h2>오늘의 좌석 현황</h2><p id="adminSeatDate"></p><p id="attendanceWindowLabel"></p></div>
+          <div><h2>좌석 현황 및 과거 기록</h2><p id="adminSeatDate"></p><p id="attendanceWindowLabel"></p></div>
           <div class="admin-seat-filters">
+            <label>날짜
+              <input id="adminDateSelect" type="date">
+            </label>
             <label>타임
               <select id="adminSessionSelect">
                 <option value="1">심야 1타임</option><option value="2">심야 2타임</option>
@@ -182,6 +185,7 @@
           <div id="femaleFloorSeats" class="all-floor-seats"></div>
         </section>
         <p id="adminSeatSummary" class="admin-seat-summary"></p>
+        <p id="adminHistoryMessage" class="message" role="alert"></p>
       </article>
     </section>
   </main>
