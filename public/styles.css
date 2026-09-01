@@ -5,6 +5,7 @@ button,input { font:inherit; } button { color:inherit; } .hidden { display:none 
 .topbar { height:64px; padding:0 max(24px,calc((100% - 1040px)/2)); display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); }
 .brand { color:var(--text); text-decoration:none; font-size:16px; font-weight:750; }
 .link-button { border:0; padding:8px 0; color:var(--muted); background:transparent; cursor:pointer; font-size:13px; }
+.account-actions { display:flex; align-items:center; gap:18px; }
 main { width:min(1040px,calc(100% - 40px)); margin:0 auto; }
 .auth-view { min-height:calc(100vh - 64px); display:grid; place-items:center; padding:48px 0; }
 .auth-card { width:min(100%,400px); }
@@ -101,6 +102,10 @@ select { padding-right:30px; }
 .dialog-actions button.absent.active { border-color:#d8aaa6; color:var(--danger); background:#fbefee; }
 .dialog-actions button.cancel { grid-column:1/-1; color:var(--danger); }
 .dialog-actions button:disabled { opacity:.4; cursor:not-allowed; }
+.account-settings-dialog { width:min(440px,calc(100% - 32px)); max-height:calc(100vh - 32px); overflow:auto; }
+.settings-form { margin-top:22px; padding-top:20px; border-top:1px solid var(--line); }
+.settings-form h3 { margin:0 0 18px; font-size:14px; }
+.settings-form .message { margin-bottom:0; }
 .admin-seat-summary { margin:0; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; }
 @media (max-width:760px) { .topbar{padding:0 20px} main{width:min(100% - 28px,1040px)} .dashboard{padding-top:32px} .page-heading{align-items:flex-start;gap:18px} .content-grid{grid-template-columns:1fr} .side-column{grid-template-columns:1fr 1fr} }
 @media (max-width:760px) { .admin-grid{grid-template-columns:1fr} .admin-seat-heading{display:grid}.admin-seat-filters{display:grid;grid-template-columns:1fr 1fr}.admin-seat-filters label{display:grid;gap:5px}.admin-seat-filters input,.admin-seat-filters select{width:100%} }
