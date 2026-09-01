@@ -16,6 +16,56 @@ let selectedAdminSession = 1;
 let selectedAdminDate = null;
 let adminAccounts = [];
 let selectedAdminSeat = null;
+const RECOVERY_STORAGE_KEY = 'midnight-study-password-recovery';
+let passwordRecovery = null;
+try {
+  const saved = JSON.parse(sessionStorage.getItem(RECOVERY_STORAGE_KEY) || 'null');
+  if (saved && /^[0-9a-f]{64}$/.test(saved.token)) passwordRecovery = saved;
+  else sessionStorage.removeItem(RECOVERY_STORAGE_KEY);
+} catch { /* Recovery can still work in memory when browser storage is unavailable. */ }
+
+function savePasswordRecovery(value) {
+  passwordRecovery = value;
+  try {
+    if (value) sessionStorage.setItem(RECOVERY_STORAGE_KEY, JSON.stringify(value));
+    else sessionStorage.removeItem(RECOVERY_STORAGE_KEY);
+  } catch { /* Do not expose tokens in a fallback URL or log. */ }
+}
+
+async function recoveryRequest(payload) {
+  const response = await fetch(`${window.SUPABASE_CONFIG.url}/functions/v1/password-recovery`, {
+    method: 'POST', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', apikey: window.SUPABASE_CONFIG.publishableKey },
+    body: JSON.stringify(payload),
+  });
+  let result;
+  try { result = await response.json(); } catch { throw new Error('서버 응답을 확인할 수 없습니다. 잠시 뒤 다시 시도해 주세요.'); }
+  if (!response.ok || result.error) {
+    const error = new Error(result.error || '요청을 처리하지 못했습니다.');
+    error.restart = result.restart;
+    throw error;
+  }
+  return result;
+}
+
+async function accountSettingsRequest(payload) {
+  const { data: sessionData, error: sessionError } = await client.auth.getSession();
+  const session = sessionData?.session;
+  if (sessionError || !session) throw new Error('로그인 시간이 만료되었습니다. 다시 로그인해 주세요.');
+  const response = await fetch(`${window.SUPABASE_CONFIG.url}/functions/v1/profile-settings`, {
+    method: 'POST', cache: 'no-store',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: window.SUPABASE_CONFIG.publishableKey,
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  let result;
+  try { result = await response.json(); } catch { throw new Error('서버 응답을 확인할 수 없습니다. 잠시 뒤 다시 시도해 주세요.'); }
+  if (!response.ok || result.error) throw new Error(result.error || '요청을 처리하지 못했습니다.');
+  return result;
+}
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -76,6 +126,7 @@ function switchTab(tabName) {
   $('#loginForm').classList.toggle('hidden', tabName !== 'login');
   $('#signupForm').classList.toggle('hidden', tabName !== 'signup');
   $('#adminSignupForm').classList.toggle('hidden', tabName !== 'admin');
+  $('#codeLoginForm').classList.toggle('hidden', tabName !== 'recovery');
   setMessage($('#authMessage'), '');
 }
 
@@ -109,6 +160,12 @@ function renderSeatArrangement(container, seats, createSeat) {
 }
 
 function render() {
+  if (passwordRecovery) {
+    ['authView', 'roomUpdateView', 'dashboardView', 'adminView', 'accountSettingsButton', 'logoutButton'].forEach((id) => $(`#${id}`).classList.add('hidden'));
+    $('#passwordResetView').classList.remove('hidden');
+    return;
+  }
+  $('#passwordResetView').classList.add('hidden');
   const loggedIn = Boolean(state?.user);
   const isAdmin = ['admin', 'super_admin'].includes(state?.user?.role);
   const needsRoomUpdate = loggedIn && !isAdmin && Boolean(state?.user?.roomUpdateRequired);
@@ -117,6 +174,7 @@ function render() {
   $('#dashboardView').classList.toggle('hidden', !loggedIn || isAdmin || needsRoomUpdate);
   $('#adminView').classList.toggle('hidden', !isAdmin);
   $('#logoutButton').classList.toggle('hidden', !loggedIn);
+  $('#accountSettingsButton').classList.toggle('hidden', !loggedIn);
   if (!loggedIn) return;
   if (isAdmin) {
     renderAdmin();
@@ -387,6 +445,7 @@ async function adminCancelReservation(seat) {
 }
 
 async function refresh() {
+  if (passwordRecovery) { render(); return; }
   if (refreshing) return;
   refreshing = true;
   try {
@@ -432,6 +491,134 @@ async function reserve(seat) {
 }
 
 $$('.tab').forEach((tab) => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
+
+$('#forgotPasswordButton').addEventListener('click', () => switchTab('recovery'));
+$('#backToLoginButton').addEventListener('click', () => switchTab('login'));
+$('#cancelPasswordResetButton').addEventListener('click', () => {
+  savePasswordRecovery(null);
+  $('#passwordResetForm').reset();
+  switchTab('login');
+  render();
+});
+
+$('#accountSettingsButton').addEventListener('click', () => {
+  const isStudent = state?.user?.role === 'student';
+  const nameInput = $('#profileSettingsForm [name="name"]');
+  const roomInput = $('#profileSettingsForm [name="room"]');
+  nameInput.value = state?.user?.name || '';
+  roomInput.value = isStudent ? (state?.user?.room || '') : '';
+  roomInput.disabled = !isStudent;
+  $('#profileRoomField').classList.toggle('hidden', !isStudent);
+  $('#profileSettingsHelp').classList.toggle('hidden', !isStudent);
+  setMessage($('#profileSettingsMessage'), '');
+  setMessage($('#changePasswordMessage'), '');
+  $('#changePasswordForm').reset();
+  $('#accountSettingsDialog').showModal();
+});
+
+$('#closeAccountSettings').addEventListener('click', () => $('#accountSettingsDialog').close());
+
+$('#profileSettingsForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  setBusy(form, true);
+  setMessage($('#profileSettingsMessage'), '');
+  try {
+    const values = Object.fromEntries(new FormData(form));
+    const name = values.name.trim().normalize('NFC');
+    const room = String(values.room || '').trim().toUpperCase().replace(/\s+/g, '');
+    await accountSettingsRequest({ action: 'profile', name, room });
+    await refresh();
+    $('#accountSettingsDialog').close();
+    setMessage(['admin', 'super_admin'].includes(state?.user?.role) ? $('#adminMessage') : $('#dashboardMessage'), '기본 정보를 수정했습니다. 다음 로그인부터 새 이름을 사용하세요.', true);
+  } catch (error) { setMessage($('#profileSettingsMessage'), readableError(error)); }
+  finally { setBusy(form, false); }
+});
+
+$('#changePasswordForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  setBusy(form, true);
+  setMessage($('#changePasswordMessage'), '');
+  try {
+    const values = Object.fromEntries(new FormData(form));
+    if (values.newPassword !== values.confirmPassword) throw new Error('새 비밀번호가 서로 다릅니다.');
+    if (values.currentPassword === values.newPassword) throw new Error('새 비밀번호는 현재 비밀번호와 다르게 입력해 주세요.');
+    if (new TextEncoder().encode(values.newPassword).length > 72) throw new Error('비밀번호가 너무 깁니다. 영문 72자 또는 한글 24자 이내로 입력해 주세요.');
+    await accountSettingsRequest({ action: 'password', currentPassword: values.currentPassword, newPassword: values.newPassword });
+    form.reset();
+    setMessage($('#changePasswordMessage'), '비밀번호를 변경했습니다.', true);
+  } catch (error) { setMessage($('#changePasswordMessage'), readableError(error)); }
+  finally { setBusy(form, false); }
+});
+
+$('#codeLoginForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  setBusy(form, true);
+  try {
+    const values = Object.fromEntries(new FormData(form));
+    const name = values.name.trim().normalize('NFC');
+    const result = await recoveryRequest({ action: 'login', name, code: values.code.trim() });
+    savePasswordRecovery({ name, token: result.token });
+    state = { user: null };
+    // This capability cannot call Supabase's authenticated application RPCs.
+    await client.auth.signOut({ scope: 'local' });
+    form.reset();
+    setMessage($('#passwordResetMessage'), '');
+    render();
+    $('#passwordResetHeading').focus();
+  } catch (error) {
+    setMessage($('#authMessage'), readableError(error));
+  } finally { setBusy(form, false); }
+});
+
+$('#passwordResetForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  setBusy(form, true);
+  let saved = false;
+  try {
+    const values = Object.fromEntries(new FormData(form));
+    if (!passwordRecovery) throw new Error('코드로 다시 로그인해 주세요.');
+    if (values.password !== values.confirmPassword) throw new Error('새 비밀번호가 서로 다릅니다.');
+    if (new TextEncoder().encode(values.password).length > 72) throw new Error('비밀번호가 너무 깁니다. 영문 72자 또는 한글 24자 이내로 입력해 주세요.');
+    const name = passwordRecovery.name;
+    await recoveryRequest({ action: 'reset', token: passwordRecovery.token, password: values.password });
+    saved = true;
+    savePasswordRecovery(null);
+    form.reset();
+    const { error } = await client.auth.signInWithPassword({ email: await nameToEmail(name), password: values.password });
+    if (error) throw error;
+    await refresh();
+  } catch (error) {
+    if (saved || error.restart) {
+      savePasswordRecovery(null);
+      form.reset();
+      switchTab('login');
+      render();
+      setMessage($('#authMessage'), saved ? '비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요.' : readableError(error), saved);
+    } else setMessage($('#passwordResetMessage'), readableError(error));
+  } finally { setBusy(form, false); }
+});
+
+$('#issuePasswordCodeForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const name = new FormData(form).get('name').trim().normalize('NFC');
+  if (!confirm(`${name} 본인을 확인하셨나요? 이 계정의 비밀번호를 바꿀 수 있는 일회용 코드를 발급합니다. 기존 코드는 무효가 됩니다.`)) return;
+  setBusy(form, true);
+  $('#passwordCodeOutput').textContent = '';
+  $('#passwordCodeOutput').classList.add('hidden');
+  try {
+    const { data, error } = await client.rpc('issue_password_login_code', { p_name: name });
+    if (error) throw error;
+    $('#passwordCodeOutput').textContent = data.code;
+    $('#passwordCodeOutput').classList.remove('hidden');
+    setMessage($('#passwordCodeMessage'), `${data.name}${data.room ? ` (${data.room})` : ''} · 시간 제한 없이 1회 사용 · 입력 오류 5회 제한. 본인에게만 전달하세요.`, true);
+  } catch (error) { setMessage($('#passwordCodeMessage'), readableError(error)); }
+  finally { setBusy(form, false); }
+});
 
 $('#loginForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -527,6 +714,7 @@ $('#adminSignupForm').addEventListener('submit', async (event) => {
 });
 
 $('#logoutButton').addEventListener('click', async () => {
+  $('#accountSettingsDialog').close();
   await client.auth.signOut();
   state = { user: null };
   render();
@@ -670,6 +858,9 @@ document.addEventListener('visibilitychange', () => {
 
 client.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') {
+    $('#passwordCodeOutput').textContent = '';
+    $('#passwordCodeOutput').classList.add('hidden');
+    setMessage($('#passwordCodeMessage'), '');
     selectedAdminDate = null;
     state = { user: null };
     render();
