@@ -1,0 +1,8 @@
+[functions.password-recovery]
+# Public entrypoint; SQL verifies a one-use code or a 256-bit reset capability.
+verify_jwt = false
+
+[functions.profile-settings]
+# Platform verification plus an in-function Auth lookup protect every operation.
+verify_jwt = true
+
