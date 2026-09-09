@@ -15,11 +15,13 @@ function fixture({ verifyError=null, authUpdateError=null, rpcError=null }={}) {
       getUser:async (token)=>{ calls.push(['getUser',token]); return { data:{ user:{ id:'user-1',email:'old@example.test',user_metadata:{ name:'기존' } } },error:null }; },
       admin:{ updateUserById:async (...args)=>{ calls.push(['updateUserById',...args]); return { error:authUpdateError }; } },
     },
-    from:()=>({ select:()=>({ eq:()=>({ single:async()=>({ data:{ name:'기존',room:'A303',role:'student' },error:null }) }) }) }),
     rpc:async (name,args)=>{ calls.push(['rpc',name,args]); return { data:{ name:args.p_name,room:args.p_room,floor:3,role:'student' },error:rpcError }; },
   };
-  const verifier={ auth:{ signInWithPassword:async (args)=>{ calls.push(['verifyPassword',args]); return { error:verifyError }; } } };
-  const handler=makeHandler((_url,key)=>key==='service'?admin:verifier);
+  const userClient={
+    auth:{ signInWithPassword:async (args)=>{ calls.push(['verifyPassword',args]); return { error:verifyError }; } },
+    rpc:async (name,args)=>{ calls.push(['rpc',name,args]); return { data:{ user:{ id:'user-1',name:'기존',room:'A303',role:'student' } },error:null }; },
+  };
+  const handler=makeHandler((_url,key)=>key==='service'?admin:userClient);
   const request=(body,authorization='Bearer valid-jwt')=>handler(new Request('https://fixture.test',{ method:'POST',headers:{ origin:'https://midnight-study.vercel.app',authorization,'content-type':'application/json' },body:JSON.stringify(body) }));
   return { calls,request };
 }
@@ -28,7 +30,7 @@ test('profile update synchronizes public profile, name-derived Auth email and me
   const { calls,request }=fixture();
   const response=await request({ action:'profile',name:' 새이름 ',room:' a304 ' });
   assert.equal(response.status,200);
-  const rpc=calls.find((call)=>call[0]==='rpc');
+  const rpc=calls.find((call)=>call[0]==='rpc' && call[1]==='update_profile_by_service');
   assert.equal(rpc[2].p_name,'새이름');
   assert.equal(rpc[2].p_room,'A304');
   const authUpdate=calls.find((call)=>call[0]==='updateUserById');
@@ -61,7 +63,7 @@ test('malformed requests and missing authentication fail before data changes',as
   assert.equal((await request({ action:'password',currentPassword:'old-password',newPassword:'short' })).status,400);
   assert.equal((await request({ action:'profile',name:'가',room:'A303' })).status,400);
   assert.equal((await request({ action:'profile',name:'학생',room:'A303' },'')).status,401);
-  assert.equal(calls.some((call)=>call[0]==='rpc'||call[0]==='updateUserById'),false);
+  assert.equal(calls.some((call)=>(call[0]==='rpc' && call[1]==='update_profile_by_service')||call[0]==='updateUserById'),false);
 });
 
 test('SQL endpoint is service-role only and prevents floor changes with an active reservation',()=>{
