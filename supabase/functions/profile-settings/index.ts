@@ -53,7 +53,9 @@ export function makeHandler(create = createClient) {
       const { data: authData, error: authError }=await admin.auth.getUser(accessToken);
       const user=authData?.user;
       if (authError || !user) return reply({ error: '로그인 시간이 만료되었습니다. 다시 로그인해 주세요.' }, 401);
-      const { data: profile, error: profileError }=await admin.from('profiles').select('name,room,role').eq('id',user.id).single();
+      const userClient=create(url,anonKey,{ ...options,global:{ headers:{ Authorization:`Bearer ${accessToken}` } } });
+      const { data: dashboard, error: profileError }=await userClient.rpc('get_dashboard',{ p_session:1 });
+      const profile=dashboard?.user;
       if (profileError || !profile || !['student','admin','super_admin'].includes(profile.role)) return reply({ error: '계정 정보를 찾을 수 없습니다.' }, 404);
 
       if (body?.action==='profile') {
@@ -62,7 +64,7 @@ export function makeHandler(create = createClient) {
         const room=profile.role==='student' ? normalizeRoom(body.room) : '';
         if (name.length<2 || name.length>20) return reply({ error: '이름은 2~20자로 입력해 주세요.' }, 400);
         const { data: updated, error: updateError }=await admin.rpc('update_profile_by_service', {
-          p_user_id:user.id,p_name:name,p_room:room,p_expected_name:profile.name,p_expected_room:profile.room,
+          p_user_id:user.id,p_name:name,p_room:room,p_expected_name:profile.name,p_expected_room:profile.room ?? null,
         });
         if (updateError) return reply({ error:updateError.message }, 400);
         const metadata={ ...(user.user_metadata || {}), name, ...(profile.role==='student' ? { room } : {}) };
@@ -82,8 +84,7 @@ export function makeHandler(create = createClient) {
       if (body?.action==='password') {
         if (typeof body.currentPassword!=='string' || typeof body.newPassword!=='string') return reply({ error:'비밀번호를 입력해 주세요.' },400);
         if (body.newPassword.length<8 || new TextEncoder().encode(body.newPassword).length>72) return reply({ error:'새 비밀번호는 8자 이상, UTF-8 기준 72바이트 이하로 입력해 주세요.' },400);
-        const verifier=create(url,anonKey,options);
-        const { error: verifyError }=await verifier.auth.signInWithPassword({ email:user.email!,password:body.currentPassword });
+        const { error: verifyError }=await userClient.auth.signInWithPassword({ email:user.email!,password:body.currentPassword });
         if (verifyError) return reply({ error:'현재 비밀번호가 올바르지 않습니다.' },400);
         const { error: passwordError }=await admin.auth.admin.updateUserById(user.id,{ password:body.newPassword });
         if (passwordError) return reply({ error:'비밀번호를 변경하지 못했습니다. 잠시 뒤 다시 시도해 주세요.' },400);
