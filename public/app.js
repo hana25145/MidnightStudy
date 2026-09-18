@@ -137,8 +137,9 @@ function formatDate(date) {
 
 function renderSeatArrangement(container, seats, createSeat) {
   container.replaceChildren();
-  container.className = `seat-grid${seats.length === 15 ? ' fifteen-seat-layout' : ''}`;
-  if (seats.length !== 15) {
+  const isPodLayout = seats.length === 11 || seats.length === 15;
+  container.className = `seat-grid${isPodLayout ? ' pod-seat-layout' : ''}`;
+  if (!isPodLayout) {
     seats.forEach((seat) => container.append(createSeat(seat)));
     return;
   }
@@ -150,7 +151,8 @@ function renderSeatArrangement(container, seats, createSeat) {
 
   const rear = document.createElement('div');
   rear.className = 'rear-seat-area';
-  [[9, 8, 10, 11], [13, 12, 14, 15]].forEach((numbers) => {
+  const pods = seats.length === 15 ? [[9, 8, 10, 11], [13, 12, 14, 15]] : [[9, 8, 10, 11]];
+  pods.forEach((numbers) => {
     const pod = document.createElement('div');
     pod.className = 'seat-pod';
     numbers.forEach((number) => pod.append(createSeat(seatsByNumber.get(number))));
