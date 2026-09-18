@@ -11,6 +11,7 @@ let state = null;
 let refreshing = false;
 let boundaryTimer = null;
 let selectedSession = 1;
+let selectedFloor = null;
 let adminSeatState = null;
 let selectedAdminSession = 1;
 let selectedAdminDate = null;
@@ -205,6 +206,11 @@ function render() {
     tab.classList.toggle('active', Number(tab.dataset.session) === selectedSession);
   });
   $('#reservationTitle').textContent = `오늘의 신청 · ${selectedSession}타임`;
+
+  $('#floorTabs').classList.toggle('hidden', !(user.eligibleFloors && user.eligibleFloors.length > 1));
+  $$('.floor-tab').forEach((tab) => {
+    tab.classList.toggle('active', Number(tab.dataset.floor) === user.floor);
+  });
 
   const badge = $('#applicationBadge');
   badge.classList.toggle('open', application.canApply);
@@ -458,13 +464,14 @@ async function refresh() {
       return;
     }
 
-    let { data, error } = await client.rpc('get_dashboard', { p_session: selectedSession });
+    let { data, error } = await client.rpc('get_dashboard', { p_session: selectedSession, p_floor: selectedFloor });
     if (error && selectedSession === 2 && /2타임|고사기간/.test(error.message || '')) {
       selectedSession = 1;
-      ({ data, error } = await client.rpc('get_dashboard', { p_session: 1 }));
+      ({ data, error } = await client.rpc('get_dashboard', { p_session: 1, p_floor: selectedFloor }));
     }
     if (error) throw error;
     state = data;
+    if (state?.user?.floor) selectedFloor = state.user.floor;
     if (['admin', 'super_admin'].includes(state?.user?.role)) {
       await loadAdminSeats();
       if (state.admin?.isSuperAdmin) await loadAdminAccounts();
@@ -481,9 +488,10 @@ async function refresh() {
 async function reserve(seat) {
   if (!confirm(`${selectedSession}타임 ${state.user.floor}층 ${seat}번 좌석을 신청할까요?`)) return;
   try {
-    const { data, error } = await client.rpc('reserve_seat', { p_seat: seat, p_session: selectedSession });
+    const { data, error } = await client.rpc('reserve_seat', { p_seat: seat, p_session: selectedSession, p_floor: selectedFloor });
     if (error) throw error;
     state = data;
+    if (state?.user?.floor) selectedFloor = state.user.floor;
     render();
     setMessage($('#dashboardMessage'), `${seat}번 좌석 신청이 완료되었습니다.`, true);
   } catch (error) {
@@ -727,12 +735,18 @@ $$('.session-tab').forEach((tab) => tab.addEventListener('click', async () => {
   await refresh().catch((error) => setMessage($('#dashboardMessage'), readableError(error)));
 }));
 
+$$('.floor-tab').forEach((tab) => tab.addEventListener('click', async () => {
+  selectedFloor = Number(tab.dataset.floor);
+  await refresh().catch((error) => setMessage($('#dashboardMessage'), readableError(error)));
+}));
+
 $('#cancelButton').addEventListener('click', async () => {
   if (!confirm('오늘의 좌석 신청을 취소할까요?')) return;
   try {
-    const { data, error } = await client.rpc('cancel_today_reservation', { p_session: selectedSession });
+    const { data, error } = await client.rpc('cancel_today_reservation', { p_session: selectedSession, p_floor: selectedFloor });
     if (error) throw error;
     state = data;
+    if (state?.user?.floor) selectedFloor = state.user.floor;
     render();
     setMessage($('#dashboardMessage'), '좌석 신청을 취소했습니다.', true);
   } catch (error) {
@@ -864,6 +878,7 @@ client.auth.onAuthStateChange((event) => {
     $('#passwordCodeOutput').classList.add('hidden');
     setMessage($('#passwordCodeMessage'), '');
     selectedAdminDate = null;
+    selectedFloor = null;
     state = { user: null };
     render();
   }

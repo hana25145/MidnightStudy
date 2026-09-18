@@ -31,8 +31,8 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(36,92,67,.1);
 .seat-card { padding:26px; } .card h2 { margin:0; font-size:16px; }
 .card-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; } .card-heading p { margin:0; color:var(--muted); font-size:12px; text-align:right; }
 .session-tabs { display:flex; gap:8px; margin-top:22px; }
-.session-tab { border:1px solid var(--line); border-radius:7px; padding:8px 12px; color:var(--muted); background:#fff; cursor:pointer; font-size:12px; }
-.session-tab.active { border-color:var(--green); color:var(--green); background:var(--green-soft); font-weight:700; }
+.session-tab,.floor-tab { border:1px solid var(--line); border-radius:7px; padding:8px 12px; color:var(--muted); background:#fff; cursor:pointer; font-size:12px; }
+.session-tab.active,.floor-tab.active { border-color:var(--green); color:var(--green); background:var(--green-soft); font-weight:700; }
 .seat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(52px,72px)); gap:10px; margin:30px 0 26px; min-width:0; }
 .pod-seat-layout { grid-template-columns:1fr; align-items:start; }
 .front-seat-bank { display:grid; grid-template-columns:repeat(7,minmax(52px,72px)); gap:10px; width:max-content; max-width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; }
