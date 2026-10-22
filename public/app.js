@@ -361,7 +361,8 @@ function renderAdminSeats() {
     renderSeatArrangement(grid, floorData.seats, (seat) => {
       const item = document.createElement(seat.occupied ? 'button' : 'div');
       if (seat.occupied) item.type = 'button';
-      item.className = `seat${seat.occupied ? ' occupied' : ''}`;
+      const attendance = attendanceClass(seat);
+      item.className = `seat${seat.occupied ? ' occupied' : ''}${attendance ? ` ${attendance}` : ''}`;
       const number = document.createElement('span');
       number.className = 'seat-number';
       number.textContent = seat.number;
@@ -374,7 +375,8 @@ function renderAdminSeats() {
         room.className = 'seat-room';
         room.textContent = seat.applicantRoom;
         item.append(name, room);
-        item.setAttribute('aria-label', `${seat.applicantName} ${seat.applicantRoom}, ${floorData.floor}층 ${seat.number}번 좌석 ${adminSeatState.editable ? '관리' : '기록 보기'}`);
+        const attendanceText = attendance === 'present' ? '출석' : attendance === 'absent' ? '불참' : '출석 미처리';
+        item.setAttribute('aria-label', `${seat.applicantName} ${seat.applicantRoom}, ${floorData.floor}층 ${seat.number}번 좌석, ${attendanceText}, ${adminSeatState.editable ? '관리' : '기록 보기'}`);
         item.addEventListener('click', () => openAdminStudentDialog(seat, floorData.floor));
       }
       return item;
@@ -392,8 +394,18 @@ function renderAdminSeats() {
     (floor.gender === 'male' ? male : female).append(renderFloor(floor));
   });
   const seats = adminSeatState.floors.flatMap((floor) => floor.seats);
-  const occupied = seats.filter((seat) => seat.occupied).length;
-  $('#adminSeatSummary').textContent = `전체 신청 ${occupied}명 / 전체 ${seats.length}석`;
+  const occupiedSeats = seats.filter((seat) => seat.occupied);
+  const present = occupiedSeats.filter((seat) => attendanceClass(seat) === 'present').length;
+  const absent = occupiedSeats.filter((seat) => attendanceClass(seat) === 'absent').length;
+  $('#adminPresentCount').textContent = `${present}명`;
+  $('#adminAbsentCount').textContent = `${absent}명`;
+  $('#adminPendingCount').textContent = `${occupiedSeats.length - present - absent}명`;
+  $('#adminSeatSummary').textContent = `전체 신청 ${occupiedSeats.length}명 / 전체 ${seats.length}석`;
+}
+
+function attendanceClass(seat) {
+  if (!seat.occupied) return '';
+  return seat.attendanceStatus === 'present' || seat.attendanceStatus === 'absent' ? seat.attendanceStatus : '';
 }
 
 async function loadAdminSeats() {
