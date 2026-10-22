@@ -81,6 +81,13 @@ select { padding-right:30px; }
 .admin-seat-grid .seat { min-width:0; min-height:60px; height:60px; padding:5px 3px; gap:2px; cursor:default; font-size:14px; }
 .admin-seat-grid button.seat.occupied { cursor:pointer; }
 .admin-seat-grid button.seat.occupied:hover { transform:translateY(-1px); border-color:#aeb6b1; }
+.admin-seat-grid .seat.occupied.present { border-color:var(--green); color:#fff; background:var(--green); }
+.admin-seat-grid .seat.occupied.absent { border-color:#d8aaa6; color:var(--danger); background:#fbefee; }
+.admin-seat-grid button.seat.occupied.present:hover { border-color:#1c4c36; }
+.admin-seat-grid button.seat.occupied.absent:hover { border-color:var(--danger); }
+.admin-attendance-legend { margin-top:22px; padding-top:0; border-top:0; }
+.admin-attendance-legend b { color:var(--text); font-weight:700; }
+.legend .present { background:var(--green); } .legend .absent { border:1px solid #d8aaa6; background:#fbefee; } .legend .pending { border:1px solid var(--line); background:var(--soft); }
 .admin-seat-grid .seat-name { font-size:9px; }
 .admin-seat-grid .seat-room { font-size:8px; }
 .gender-floor-group { margin-top:28px; }
